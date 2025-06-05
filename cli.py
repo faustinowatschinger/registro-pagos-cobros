@@ -546,12 +546,22 @@ class App(tk.Tk):
 
         acc_win = None
         acc_tree = None
+        acc_hide_id = None
 
         def hide_acc_popup(event=None):
-            nonlocal acc_win
+            nonlocal acc_win, acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+                acc_hide_id = None
             if acc_win:
                 acc_win.destroy()
                 acc_win = None
+
+        def hide_acc_popup_later(event=None):
+            nonlocal acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+            acc_hide_id = e_nombre.after(150, hide_acc_popup)
 
         def show_acc_popup(code_entry, name_entry, event=None):
             nonlocal acc_win, acc_tree
@@ -581,6 +591,7 @@ class App(tk.Tk):
             for c, n in matches:
                 acc_tree.insert('', 'end', values=(c, n))
             acc_tree.pack(expand=True, fill='both')
+            acc_tree.focus_set()
 
             def choose_account(ev=None):
                 sel = acc_tree.selection()
@@ -598,11 +609,11 @@ class App(tk.Tk):
             acc_tree.bind('<ButtonRelease-1>', choose_account)
             acc_tree.bind('<Return>', choose_account)
             acc_tree.bind('<Escape>', lambda e: hide_acc_popup())
-            acc_tree.bind('<FocusOut>', hide_acc_popup)
+            acc_tree.bind('<FocusOut>', hide_acc_popup_later)
 
             x = name_entry.winfo_rootx()
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
-            acc_win.geometry(f'+{x}+{y}')    
+            acc_win.geometry(f'+{x}+{y}')   
     
         def fill_con(event, codigo_entry, concepto_entry):
             clave = codigo_entry.get().strip()
@@ -616,38 +627,46 @@ class App(tk.Tk):
         # Enlazar cada Entry de código con fill_con
         for ent_codigo, ent_concepto, ent_importe in imps:
             ent_concepto.bind('<Button-1>', lambda e, c=ent_codigo, o=ent_concepto: show_acc_popup(c, o))
-            ent_concepto.bind('<FocusOut>', hide_acc_popup)
+            ent_concepto.bind('<FocusOut>', hide_acc_popup_later)
     
-        # — 5) Total e Impuestos (sólo IVA) —
-        totf = ttk.Frame(cont, padding=5)
-        totf.pack(fill='x')
-        ttk.Label(totf, text='TOTAL:', style='Field.TLabel').grid(row=0, column=0, sticky='e')
-        l_tot = ttk.Label(totf, text='0.00', style='Field.TLabel')
-        l_tot.grid(row=0, column=1, sticky='w', padx=10)
-    
-        # — 5.1) Impuestos (IIBB, DByCR, IVA) —
-        taxf = ttk.Frame(cont, padding=5)
+        # — 5) Total — (debajo de las imputaciones)
+        ttk.Label(det, text='TOTAL:', style='Field.TLabel').grid(row=4, column=1, sticky='e')
+        l_tot = ttk.Label(det, text='0.00', style='Field.TLabel')
+        l_tot.grid(row=4, column=2, sticky='e', padx=1)
+
+        # — 5.1) CARGA IMPOSITIVA —
+        taxf = ttk.LabelFrame(cont, text='CARGA IMPOSITIVA', padding=5)
         taxf.pack(fill='x', pady=(10,0))
     
+
         ttk.Label(taxf, text='% IIBB:', style='Field.TLabel').grid(row=0, column=0, sticky='e')
         e_iibb = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
         e_iibb.grid(row=0, column=1, sticky='w', padx=(5,15))
     
         ttk.Label(taxf, text='% DByCR:', style='Field.TLabel').grid(row=0, column=2, sticky='e')
+        e_iibb.grid(row=0, column=1, sticky='w', padx=(5,10))
+        ttk.Label(taxf, text='Importe:', style='Field.TLabel').grid(row=0, column=2, sticky='e')
+        l_iibb = ttk.Label(taxf, text='0.00', style='Field.TLabel')
+        l_iibb.grid(row=0, column=3, sticky='w', padx=(5,15))
+
+        ttk.Label(taxf, text='% DByCR:', style='Field.TLabel').grid(row=1, column=0, sticky='e')
         e_dby = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
-        e_dby.grid(row=0, column=3, sticky='w', padx=(5,15))
-    
-        ttk.Label(taxf, text='% IVA:', style='Field.TLabel').grid(row=0, column=4, sticky='e')
+
+        e_dby.grid(row=1, column=1, sticky='w', padx=(5,10))
+        ttk.Label(taxf, text='Importe:', style='Field.TLabel').grid(row=1, column=2, sticky='e')
+        l_dby = ttk.Label(taxf, text='0.00', style='Field.TLabel')
+        l_dby.grid(row=1, column=3, sticky='w', padx=(5,15))
+
+        ttk.Label(taxf, text='% IVA:', style='Field.TLabel').grid(row=2, column=0, sticky='e')
         e_iva = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
-        e_iva.grid(row=0, column=5, sticky='w')
-    
-        # — 5.3) Total con Impuestos —
-        tot_impf = ttk.Frame(cont, padding=5)
-        tot_impf.pack(fill='x', pady=(5,0))
-        ttk.Label(tot_impf, text='TOTAL c/ Impuestos:', style='Field.TLabel').grid(row=0, column=0, sticky='e')
-        l_tot_imp = ttk.Label(tot_impf, text='0.00', style='Field.TLabel')
-        l_tot_imp.grid(row=0, column=1, sticky='w', padx=10)
-    
+
+        # — 5.3) CAJA O CUENTA BANCARIA DONDE INGRESA EL PAGO —
+        ttk.Label(
+            cont,
+            text='CAJA O CUENTA BANCARIA DONDE INGRESA EL PAGO',
+            style='Field.TLabel'
+        ).pack(fill='x', pady=(5,0))
+
         # — 6) Cuentas A/B y Observaciones —
         box_ab = ttk.Frame(cont, padding=5)
         box_ab.pack(fill='x', pady=(0,10))
@@ -656,6 +675,8 @@ class App(tk.Tk):
         ca = ttk.Entry(box_ab, style='Field.TEntry', width=12); ca.grid(row=0, column=1, padx=5)
         ttk.Label(box_ab, text='Detalle A:', style='Field.TLabel').grid(row=0, column=2, padx=10)
         da = ttk.Entry(box_ab, style='Field.TEntry', width=25, state='readonly'); da.grid(row=0, column=3)
+        da.bind('<Button-1>', lambda e: show_cash_popup(ca, da))
+        da.bind('<FocusOut>', hide_cash_popup_later)
         ttk.Label(box_ab, text='Monto A:', style='Field.TLabel').grid(row=0, column=4, padx=10)
         ma = ttk.Entry(box_ab, style='Field.TEntry', width=10); ma.grid(row=0, column=5)
     
@@ -663,6 +684,8 @@ class App(tk.Tk):
         cb = ttk.Entry(box_ab, style='Field.TEntry', width=12); cb.grid(row=1, column=1, padx=5)
         ttk.Label(box_ab, text='Detalle B:', style='Field.TLabel').grid(row=1, column=2, padx=10, pady=5)
         db = ttk.Entry(box_ab, style='Field.TEntry', width=25, state='readonly'); db.grid(row=1, column=3, pady=5)
+        db.bind('<Button-1>', lambda e: show_cash_popup(cb, db))
+        db.bind('<FocusOut>', hide_cash_popup_later)
         ttk.Label(box_ab, text='Monto B:', style='Field.TLabel').grid(row=1, column=4, padx=10, pady=5)
         mb = ttk.Entry(box_ab, style='Field.TEntry', width=10); mb.grid(row=1, column=5, pady=5)
     
@@ -736,9 +759,12 @@ class App(tk.Tk):
                 e_iva.insert(0, f"{pct_iva:.2f}")
                 e_iva.config(state='readonly')
     
-                # 7) Total con impuestos: 
-                #    - montoA + montoB 
-                #    - más impuestos IIBB y DByCR correspondientes a A y B 
+                l_iibb.config(text=f"{monto_iibb_A + monto_iibb_B:.2f}")
+                l_dby.config(text=f"{monto_dbcr_A + monto_dbcr_B:.2f}")
+                l_iva.config(text=f"{monto_iva:.2f}")
+                # 7) Total con impuestos:
+                #    - montoA + montoB
+                #    - más impuestos IIBB y DByCR correspondientes a A y B
                 #    - más IVA correspondiente a A y B
                 total_con_imp = (
                     montoA_val + montoB_val
@@ -746,7 +772,6 @@ class App(tk.Tk):
                     + monto_dbcr_A + monto_dbcr_B
                     + monto_iva
                 )
-                l_tot_imp.config(text=f"{total_con_imp:.2f}")
     
             except Exception:
                 # Si ocurre cualquier error (por ej. campo vacío), no interrumpe la app
