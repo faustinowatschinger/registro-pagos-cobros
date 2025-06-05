@@ -427,27 +427,105 @@ class App(tk.Tk):
         ttk.Label(sec2, text='N.° Cliente:',        style='Field.TLabel').grid(row=0, column=0, sticky='w')
         e_cli    = ttk.Entry(sec2, style='Field.TEntry', width=10); e_cli.grid(row=0, column=1, padx=5)
         ttk.Label(sec2, text='Nombre y Apellido:',  style='Field.TLabel').grid(row=0, column=2, padx=10)
-        e_nombre = ttk.Entry(sec2, style='Field.TEntry', width=45, state='readonly'); e_nombre.grid(row=0, column=3)
+        e_nombre = ttk.Entry(sec2, style='Field.TEntry', width=45); e_nombre.grid(row=0, column=3)
         ttk.Label(sec2, text='Fracción:',           style='Field.TLabel').grid(row=0, column=4, padx=10)
         e_par    = ttk.Entry(sec2, style='Field.TEntry', width=10); e_par.grid(row=0, column=5)
 
         def load_cli(ev=None):
             r = self.clientes.get(e_cli.get().strip())
-            for w in (e_nombre, e_par):
-                w.config(state='normal')
-                w.delete(0, 'end')
+            e_nombre.delete(0, 'end')
+            e_par.delete(0, 'end')
             if r:
                 e_nombre.insert(0, r[1])
                 e_par.insert(0, r[7] or '')
-            for w in (e_nombre, e_par):
-                w.config(state='readonly')
 
         e_cli.bind('<FocusOut>', load_cli)
     
+        suggest_win = None
+        tree_sug = None
+        hide_after_id = None
+
+        def hide_suggestions(event=None):
+            nonlocal suggest_win, hide_after_id
+            if hide_after_id:
+                e_nombre.after_cancel(hide_after_id)
+                hide_after_id = None
+            if suggest_win:
+                suggest_win.destroy()
+                suggest_win = None
+
+        def hide_suggestions_later(event=None):
+            nonlocal hide_after_id
+            if hide_after_id:
+                e_nombre.after_cancel(hide_after_id)
+            hide_after_id = e_nombre.after(150, hide_suggestions)
+
+        def select_suggestion(event=None):
+            nonlocal suggest_win
+            sel = tree_sug.selection()
+            if sel:
+                vals = tree_sug.item(sel[0], 'values')
+                e_cli.delete(0, 'end')
+                e_cli.insert(0, vals[0])
+                e_nombre.delete(0, 'end')
+                e_nombre.insert(0, vals[1])
+                e_par.delete(0, 'end')
+                e_par.insert(0, vals[2])
+                e_nombre.focus_set()
+            hide_suggestions()
+
+        def show_suggestions(event=None):
+            nonlocal suggest_win, tree_sug
+            query = e_nombre.get().strip().lower()
+            if not query:
+                hide_suggestions()
+                return
+            matches = []
+            for tup in self.clientes.values():
+                name = str(tup[1]).lower()
+                pos = name.find(query)
+                if pos != -1:
+                    matches.append((pos, len(name), tup))
+            matches.sort(key=lambda x: (x[0], x[1]))
+            matches = [m[2] for m in matches[:5]]
+            if not matches:
+                hide_suggestions()
+                return
+            if suggest_win is None:
+                suggest_win = tk.Toplevel(self)
+                suggest_win.wm_overrideredirect(True)
+                suggest_win.attributes('-topmost', True)
+                tree_sug = ttk.Treeview(
+                    suggest_win,
+                    columns=('ID','Nombre','Parcela'),
+                    show='headings',
+                    height=5
+                )
+                for c in ('ID','Nombre','Parcela'):
+                    tree_sug.heading(c, text=c)
+                    tree_sug.column(c, width=120 if c!='Nombre' else 200)
+                tree_sug.pack(expand=True, fill='both')
+                tree_sug.bind('<ButtonRelease-1>', select_suggestion)
+                tree_sug.bind('<Return>', select_suggestion)
+                tree_sug.bind('<FocusOut>', hide_suggestions_later)
+                tree_sug.bind('<Escape>', lambda e: hide_suggestions())
+            else:
+                for item in tree_sug.get_children():
+                    tree_sug.delete(item)
+            for tup in matches:
+                tree_sug.insert('', 'end', values=(tup[0], tup[1], tup[7]))
+            x = e_nombre.winfo_rootx()
+            y = e_nombre.winfo_rooty() + e_nombre.winfo_height()
+            suggest_win.geometry(f'+{x}+{y}')
+            suggest_win.deiconify()
+
+        e_nombre.bind('<KeyRelease>', show_suggestions)
+        e_nombre.bind('<FocusOut>', hide_suggestions_later)
+
         # — 4) Detalle de Imputaciones —
         det = ttk.Frame(cont, padding=5)
         det.pack(fill='x', pady=(0,10))
-        cols = ['Imputación','Concepto','Importe']
+        cols = ['N° de Cuenta','Concepto que abona','Importe']
         for j, c in enumerate(cols):
             ttk.Label(det, text=c, style='Field.TLabel', borderwidth=1, relief='solid')\
                .grid(row=0, column=j, sticky='nsew', padx=1)
@@ -465,6 +543,66 @@ class App(tk.Tk):
                     ent.config(state='readonly')
                 fila.append(ent)
             imps.append(fila)
+
+        acc_win = None
+        acc_tree = None
+
+        def hide_acc_popup(event=None):
+            nonlocal acc_win
+            if acc_win:
+                acc_win.destroy()
+                acc_win = None
+
+        def show_acc_popup(code_entry, name_entry, event=None):
+            nonlocal acc_win, acc_tree
+            cli_name = e_nombre.get().strip().lower()
+            if not cli_name:
+                return
+            matches = [
+                (c, n) for c, n in self.plan.items()
+                if cli_name in n.lower()
+            ]
+            if not matches:
+                return
+            if acc_win:
+                acc_win.destroy()
+            acc_win = tk.Toplevel(self)
+            acc_win.wm_overrideredirect(True)
+            acc_win.attributes('-topmost', True)
+            acc_tree = ttk.Treeview(
+                acc_win,
+                columns=('Cod', 'Nombre'),
+                show='headings',
+                height=min(len(matches), 5)
+            )
+            for h, w in (('Cod', 120), ('Nombre', 250)):
+                acc_tree.heading(h, text=h)
+                acc_tree.column(h, width=w)
+            for c, n in matches:
+                acc_tree.insert('', 'end', values=(c, n))
+            acc_tree.pack(expand=True, fill='both')
+
+            def choose_account(ev=None):
+                sel = acc_tree.selection()
+                if sel:
+                    cod, nombre = acc_tree.item(sel[0], 'values')
+                    code_entry.delete(0, 'end')
+                    code_entry.insert(0, cod)
+                    name_entry.config(state='normal')
+                    name_entry.delete(0, 'end')
+                    name_entry.insert(0, nombre)
+                    name_entry.config(state='readonly')
+                    code_entry.focus_set()
+                hide_acc_popup()
+
+            acc_tree.bind('<ButtonRelease-1>', choose_account)
+            acc_tree.bind('<Return>', choose_account)
+            acc_tree.bind('<Escape>', lambda e: hide_acc_popup())
+            acc_tree.bind('<FocusOut>', hide_acc_popup)
+
+            x = name_entry.winfo_rootx()
+            y = name_entry.winfo_rooty() + name_entry.winfo_height()
+            acc_win.geometry(f'+{x}+{y}')    
     
         def fill_con(event, codigo_entry, concepto_entry):
             clave = codigo_entry.get().strip()
@@ -477,8 +615,8 @@ class App(tk.Tk):
     
         # Enlazar cada Entry de código con fill_con
         for ent_codigo, ent_concepto, ent_importe in imps:
-            ent_codigo.bind('<FocusOut>',  lambda e, c=ent_codigo, o=ent_concepto: fill_con(e, c, o))
-            ent_codigo.bind('<KeyRelease>', lambda e, c=ent_codigo, o=ent_concepto: fill_con(e, c, o))
+            ent_concepto.bind('<Button-1>', lambda e, c=ent_codigo, o=ent_concepto: show_acc_popup(c, o))
+            ent_concepto.bind('<FocusOut>', hide_acc_popup)
     
         # — 5) Total e Impuestos (sólo IVA) —
         totf = ttk.Frame(cont, padding=5)
