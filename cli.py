@@ -27,6 +27,29 @@ def build_styles(root):
     style.configure('Header.TLabel', font=('Segoe UI', 14))
     return style
 
+class PlaceholderEntry(ttk.Entry):
+    """Entry widget with placeholder text support."""
+
+    def __init__(self, master=None, placeholder="", **kwargs):
+        super().__init__(master, **kwargs)
+        self.placeholder = placeholder
+        self._ph_visible = False
+        self.bind("<FocusIn>", self._clear)
+        self.bind("<FocusOut>", self._show)
+        self._show()
+
+    def _show(self, event=None):
+        if not self.get():
+            self._ph_visible = True
+            self.insert(0, self.placeholder)
+            self.configure(foreground="gray")
+
+    def _clear(self, event=None):
+        if self._ph_visible:
+            self.delete(0, "end")
+            self.configure(foreground="black")
+            self._ph_visible = False
+
 # Lectura genérica de registros
 def read_records(path):
     if not os.path.exists(path):
@@ -217,32 +240,53 @@ class App(tk.Tk):
         }
         headers = headers_map.get(filename, [f'C{i+1}' for i in range(len(registros[0]))])
 
-        # 5) Creamos los Entry de filtro directamente en 'cont', en la fila 0,
-        #    una columna por cada encabezado. Hacemos un grid_columnconfigure
-        #    para que cada columna se expanda de forma equitativa.
+        # 5) Creamos un sub-frame para la tabla y otro Canvas para la fila de
+        #    filtros para que se desplace junto con el Treeview.
+        table = ttk.Frame(cont)
+        table.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+        cont.grid_columnconfigure(0, weight=1)
+
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(headers), sticky='ew')
+        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
+
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
         filtro_entrys = {}
         for col_index, col_name in enumerate(headers):
-            ent = ttk.Entry(cont, style='Field.TEntry')
+            ent = PlaceholderEntry(filtro_frame, placeholder=col_name, style='Field.TEntry')
             ent.grid(row=0, column=col_index, padx=1, sticky='ew')
-            ent.insert(0, "")  # vacío por defecto
+            filtro_frame.grid_columnconfigure(col_index, weight=1)
             filtro_entrys[col_index] = ent
-            cont.grid_columnconfigure(col_index, weight=1)
 
         # 6) Ahora creamos el Treeview justo debajo de la fila de filtros.
         #    El Treeview ocupará tantas columnas como 'headers',
         #    y la scrollbar vertical irá en la columna 'len(headers)'.
-        vsb = ttk.Scrollbar(cont, orient='vertical')
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
+        vsb = ttk.Scrollbar(table, orient='vertical')
+        hsb = ttk.Scrollbar(table, orient='horizontal')
+
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            hsb.set(*args)
 
         tree = ttk.Treeview(
-            cont,
+            table,
             columns=headers,
             show='headings',
             yscrollcommand=vsb.set,
-            xscrollcommand=hsb.set
+            xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-        hsb.config(command=tree.xview)
+
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+
+        hsb.config(command=_scroll_x)
 
         # Ubicamos el Treeview en row=1, column=0..(len(headers)-1)
         tree.grid(row=1, column=0, columnspan=len(headers), sticky='nsew')
@@ -251,8 +295,7 @@ class App(tk.Tk):
         # Scroll horizontal justo debajo del Treeview
         hsb.grid(row=2, column=0, columnspan=len(headers), sticky='ew')
 
-        # Hacemos que el Treeview crezca al expandir el contenedor
-        cont.grid_rowconfigure(1, weight=1)
+        table.grid_rowconfigure(1, weight=1)
 
         for h in headers:
             tree.heading(h, text=h)
@@ -282,9 +325,11 @@ class App(tk.Tk):
 
         # 9) Botón “Eliminar seleccionado”
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=3, column=0, columnspan=len(headers), sticky='w', pady=(5,0))
+        btn_frame.grid(row=1, column=0, sticky='w', pady=(5,0))
         boton_eliminar = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
         boton_eliminar.grid(row=0, column=0, padx=5)
+        boton_editar = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
+        boton_editar.grid(row=0, column=1, padx=5)
 
         def eliminar_seleccionado():
             sel = tree.selection()
@@ -307,6 +352,54 @@ class App(tk.Tk):
 
         boton_eliminar.config(command=eliminar_seleccionado)
 
+        def editar_seleccionado():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Ningún registro seleccionado.')
+                return
+            valores = tree.item(sel[0], 'values')
+            id_sel = valores[0]
+            idx_reg = None
+            for i, r in enumerate(registros):
+                if str(r[0]) == str(id_sel):
+                    idx_reg = i
+                    break
+            if idx_reg is None:
+                return
+
+            orig_row = list(registros[idx_reg])
+
+            win = tk.Toplevel(self)
+            win.title('Editar registro')
+            entries = []
+            for j, h in enumerate(headers):
+                ttk.Label(win, text=h, style='Field.TLabel').grid(row=j, column=0, sticky='e', padx=5, pady=2)
+                e = ttk.Entry(win, style='Field.TEntry')
+                e.grid(row=j, column=1, sticky='w', padx=5, pady=2)
+                e.insert(0, str(valores[j]))
+                entries.append(e)
+
+            def guardar():
+                nuevos = []
+                for val, orig in zip(entries, orig_row):
+                    txt = val.get()
+                    try:
+                        if isinstance(orig, int):
+                            nuevos.append(int(txt))
+                        elif isinstance(orig, float):
+                            nuevos.append(float(txt))
+                        else:
+                            nuevos.append(txt)
+                    except ValueError:
+                        nuevos.append(txt)
+                registros[idx_reg] = tuple(nuevos)
+                overwrite_records(full_path, registros)
+                aplicar_filtros()
+                win.destroy()
+
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=len(headers), column=0, columnspan=2, pady=10)
+
+        boton_editar.config(command=editar_seleccionado)
 
 
 
@@ -1260,38 +1353,61 @@ class App(tk.Tk):
         cols = ['Num cuenta', 'Nombre']
 
         # PREPARAMOS GRID COLUMNS = 2
-        for col_idx in range(len(cols)):
-            cont.grid_columnconfigure(col_idx, weight=1)
+        cont.grid_columnconfigure(0, weight=1)
+
+        # Frame de tabla con filtros y treeview
+        table = ttk.Frame(cont)
+        table.grid(row=1, column=0, sticky='nsew', columnspan=len(cols))
+        cont.grid_rowconfigure(1, weight=1)
+
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
+
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
 
         # — FILTROS (row=1) — uno por cada columna
         filtro_entrys = {}
         for col_idx, col_name in enumerate(cols):
-            ent = ttk.Entry(cont, style='Field.TEntry')
-            ent.grid(row=1, column=col_idx, padx=1, sticky='ew')
-            ent.insert(0, "")
+            ent = PlaceholderEntry(filtro_frame, placeholder=col_name, style='Field.TEntry')
+            ent.grid(row=0, column=col_idx, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(col_idx, weight=1)
             filtro_entrys[col_idx] = ent
 
         # — TREEVIEW + SCROLLBARS (row=2) —
-        vsb = ttk.Scrollbar(cont, orient='vertical')
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
+        vsb = ttk.Scrollbar(table, orient='vertical')
+        hsb = ttk.Scrollbar(table, orient='horizontal')
+
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            hsb.set(*args)
 
         tree = ttk.Treeview(
-            cont,
+            table,
             columns=cols,
             show='headings',
             yscrollcommand=vsb.set,
-            xscrollcommand=hsb.set
+            xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-        hsb.config(command=tree.xview)
 
         # Ubicamos el Treeview en row=2, columna 0..1
-        tree.grid(row=2, column=0, columnspan=len(cols), sticky='nsew', pady=(5,0))
-        vsb.grid(row=2, column=len(cols), sticky='ns', pady=(5,0))
-        hsb.grid(row=3, column=0, columnspan=len(cols), sticky='ew')
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+
+        hsb.config(command=_scroll_x)
 
         # Hacemos que el Treeview crezca verticalmente
-        cont.grid_rowconfigure(2, weight=1)
+        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew', pady=(5,0))
+        vsb.grid(row=1, column=len(cols), sticky='ns', pady=(5,0))
+        hsb.grid(row=2, column=0, columnspan=len(cols), sticky='ew')
+
+        table.grid_rowconfigure(1, weight=1)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -1327,9 +1443,11 @@ class App(tk.Tk):
 
         # Botón “Eliminar cuenta seleccionada” (row=4)
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=4, column=0, columnspan=len(cols), sticky='w', pady=(10,0))
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(10,0))
         btn_elim = ttk.Button(btn_frame, text='Eliminar cuenta seleccionada', style='Big.TButton')
         btn_elim.grid(row=0, column=0, padx=5)
+        btn_edit = ttk.Button(btn_frame, text='Editar cuenta seleccionada', style='Big.TButton')
+        btn_edit.grid(row=0, column=1, padx=5)
 
         def eliminar_plan():
             sel = tree.selection()
@@ -1351,9 +1469,48 @@ class App(tk.Tk):
 
         btn_elim.config(command=eliminar_plan)
 
+        def editar_plan():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione una cuenta.')
+                return
+            vals = tree.item(sel[0], 'values')
+            num_cuenta = vals[0]
+            idx_reg = None
+            for i, r in enumerate(regs):
+                if str(r[0]) == str(num_cuenta):
+                    idx_reg = i
+                    break
+            if idx_reg is None:
+                return
+
+            orig_row = list(regs[idx_reg])
+
+            win = tk.Toplevel(self)
+            win.title('Editar cuenta')
+            ttk.Label(win, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
+            e_num = ttk.Entry(win, style='Field.TEntry')
+            e_num.grid(row=0, column=1, padx=5, pady=2)
+            e_num.insert(0, vals[0])
+            ttk.Label(win, text='Nombre:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
+            e_nom = ttk.Entry(win, style='Field.TEntry')
+            e_nom.grid(row=1, column=1, padx=5, pady=2)
+            e_nom.insert(0, vals[1])
+
+            def guardar():
+                regs[idx_reg] = (e_num.get(), e_nom.get())
+                overwrite_records(full_path, regs)
+                self._load_data()
+                aplicar_filtros_plan()
+                win.destroy()
+
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
+
+        btn_edit.config(command=editar_plan)
+
         # Formulario para agregar nuevas cuentas (row=5)
         frm2 = ttk.Frame(cont, padding=5)
-        frm2.grid(row=5, column=0, columnspan=len(cols), sticky='ew', pady=(10,0))
+        frm2.grid(row=3, column=0, sticky='ew', pady=(10,0))
         ttk.Label(frm2, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0)
         cde = ttk.Entry(frm2, style='Field.TEntry')
         cde.grid(row=0, column=1, padx=(5,20))
@@ -1390,47 +1547,64 @@ class App(tk.Tk):
         # 4) Columnas definidas (se mostrarán: Cuenta, Nombre, %IIBB, %DByCR)
         cols = ['Cuenta', 'Nombre', '%IIBB', '%DByCR']
 
-        # PREPARAMOS GRID COLUMNS = 4
-        for col_idx in range(len(cols)):
-            cont.grid_columnconfigure(col_idx, weight=1)
+        cont.grid_columnconfigure(0, weight=1)
+
+        table = ttk.Frame(cont)
+        table.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
+
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
 
         # — FILTROS (row=0) — solamente para las dos primeras columnas
         filtro_entrys = {}
-        ent_cuenta = ttk.Entry(cont, style='Field.TEntry')
+        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
         ent_cuenta.grid(row=0, column=0, padx=1, pady=(0,5), sticky='ew')
-        ent_cuenta.insert(0, "")
+        filtro_frame.grid_columnconfigure(0, weight=1)
         filtro_entrys[0] = ent_cuenta
 
-        ent_nombre = ttk.Entry(cont, style='Field.TEntry')
+        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
         ent_nombre.grid(row=0, column=1, padx=1, pady=(0,5), sticky='ew')
-        ent_nombre.insert(0, "")
+        filtro_frame.grid_columnconfigure(1, weight=1)
         filtro_entrys[1] = ent_nombre
 
-        # Para las columnas %IIBB (índice 2) y %DByCR (índice 3) no hay filtro,
-        # pero igual ocupamos su espacio para alinear:
-        # simplemente agregamos un Label vacío para que "reserve" la columna.
-        ttk.Label(cont, text='').grid(row=0, column=2, padx=1, pady=(0,5))
-        ttk.Label(cont, text='').grid(row=0, column=3, padx=1, pady=(0,5))
+        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=(0,5))
+        ttk.Label(filtro_frame, text='').grid(row=0, column=3, padx=1, pady=(0,5))
 
-        # — TREEVIEW + SCROLLBARS (row=1) —
-        vsb = ttk.Scrollbar(cont, orient='vertical')
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
+        vsb = ttk.Scrollbar(table, orient='vertical')
+        hsb = ttk.Scrollbar(table, orient='horizontal')
+
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            hsb.set(*args)
 
         tree = ttk.Treeview(
-            cont,
+            table,
             columns=cols,
             show='headings',
             yscrollcommand=vsb.set,
-            xscrollcommand=hsb.set
+            xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-        hsb.config(command=tree.xview)
+
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+
+        hsb.config(command=_scroll_x)
 
         # Ubicar el Treeview en row=1, columna 0..3
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
         hsb.grid(row=2, column=0, columnspan=len(cols), sticky='ew')
-        cont.grid_rowconfigure(1, weight=1)
+        table.grid_rowconfigure(1, weight=1)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -1479,9 +1653,11 @@ class App(tk.Tk):
 
         # 11) Botón “Eliminar seleccionado” (row=3)
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=3, column=0, columnspan=len(cols), sticky='w', pady=(5,0))
+        btn_frame.grid(row=1, column=0, sticky='w', pady=(5,0))
         boton_elim = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
         boton_elim.grid(row=0, column=0, padx=5)
+        boton_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
+        boton_edit.grid(row=0, column=1, padx=5)
 
         def eliminar_tax_cobros():
             sel = tree.selection()
@@ -1510,9 +1686,54 @@ class App(tk.Tk):
 
         boton_elim.config(command=eliminar_tax_cobros)
 
+        def editar_tax_cobros():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            vals = tree.item(sel[0], 'values')
+            num_cuenta = vals[0]
+            idx_reg = None
+            for i, r in enumerate(regs):
+                if str(r[0]) == str(num_cuenta):
+                    idx_reg = i
+                    break
+            if idx_reg is None:
+                return
+
+            orig_row = list(regs[idx_reg])
+
+            win = tk.Toplevel(self)
+            win.title('Editar impuestos')
+            ttk.Label(win, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
+            e_c = ttk.Entry(win, style='Field.TEntry')
+            e_c.grid(row=0, column=1, padx=5, pady=2)
+            e_c.insert(0, vals[0])
+            ttk.Label(win, text='%IIBB:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
+            e_i = ttk.Entry(win, style='Field.TEntry')
+            e_i.grid(row=1, column=1, padx=5, pady=2)
+            e_i.insert(0, vals[2])
+            ttk.Label(win, text='%DByCR:', style='Field.TLabel').grid(row=2, column=0, sticky='e', padx=5, pady=2)
+            e_d = ttk.Entry(win, style='Field.TEntry')
+            e_d.grid(row=2, column=1, padx=5, pady=2)
+            e_d.insert(0, vals[3])
+
+            def guardar():
+                try:
+                    regs[idx_reg] = (e_c.get(), float(e_i.get()), float(e_d.get()))
+                    overwrite_records(full_path, regs)
+                    aplicar_filtros_tax_cobros()
+                    win.destroy()
+                except ValueError:
+                    messagebox.showerror('Error', 'Valores inválidos')
+
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
+
+        boton_edit.config(command=editar_tax_cobros)
+
         # 12) Formulario “Agregar” (row=4)
         f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=4, column=0, columnspan=len(cols), sticky='ew', padx=10, pady=10)
+        f2.grid(row=2, column=0, sticky='ew', padx=10, pady=10)
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
         ttk.Label(f2, text='%IIBB:').grid(row=0, column=2, padx=10)
@@ -1549,44 +1770,65 @@ class App(tk.Tk):
         cols = ['Cuenta', 'Nombre', '%DByCR Banc.']
 
         # PREPARAMOS GRID COLUMNS = 3
-        for col_idx in range(len(cols)):
-            cont.grid_columnconfigure(col_idx, weight=1)
+        cont.grid_columnconfigure(0, weight=1)
+
+        table = ttk.Frame(cont)
+        table.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
+
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
 
         # — FILTROS (row=0) — solo para las primeras dos
         filtro_entrys = {}
-        ent_cuenta = ttk.Entry(cont, style='Field.TEntry')
+        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
         ent_cuenta.grid(row=0, column=0, padx=1, pady=(0,5), sticky='ew')
-        ent_cuenta.insert(0, "")
+        filtro_frame.grid_columnconfigure(0, weight=1)
         filtro_entrys[0] = ent_cuenta
 
-        ent_nombre = ttk.Entry(cont, style='Field.TEntry')
+        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
         ent_nombre.grid(row=0, column=1, padx=1, pady=(0,5), sticky='ew')
-        ent_nombre.insert(0, "")
+        filtro_frame.grid_columnconfigure(1, weight=1)
         filtro_entrys[1] = ent_nombre
 
         # Reservamos columna 2 (%DByCR Banc.) solo como espacio en blanco
-        ttk.Label(cont, text='').grid(row=0, column=2, padx=1, pady=(0,5))
+        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=(0,5))
 
-        # — TREEVIEW + SCROLLBARS (row=1) —
-        vsb = ttk.Scrollbar(cont, orient='vertical')
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
+        vsb = ttk.Scrollbar(table, orient='vertical')
+        hsb = ttk.Scrollbar(table, orient='horizontal')
+
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            hsb.set(*args)
 
         tree = ttk.Treeview(
-            cont,
+            table,
             columns=cols,
             show='headings',
             yscrollcommand=vsb.set,
-            xscrollcommand=hsb.set
+            xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-        hsb.config(command=tree.xview)
+
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+
+        hsb.config(command=_scroll_x)
 
         # Ubicar el Treeview en row=1, columna 0..2
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
         hsb.grid(row=2, column=0, columnspan=len(cols), sticky='ew')
 
-        cont.grid_rowconfigure(1, weight=1)
+        table.grid_rowconfigure(1, weight=1)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -1635,9 +1877,11 @@ class App(tk.Tk):
 
         # 5) Botón “Eliminar seleccionado” (row=3)
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=3, column=0, columnspan=len(cols), sticky='w', pady=(10,0))
+        btn_frame.grid(row=1, column=0, sticky='w', pady=(10,0))
         boton_elim = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
         boton_elim.grid(row=0, column=0, padx=5)
+        boton_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
+        boton_edit.grid(row=0, column=1, padx=5)
 
         def eliminar_tax_pagos():
             sel = tree.selection()
@@ -1666,9 +1910,48 @@ class App(tk.Tk):
 
         boton_elim.config(command=eliminar_tax_pagos)
 
+        def editar_tax_pagos():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            vals = tree.item(sel[0], 'values')
+            num_cuenta = vals[0]
+            idx_reg = None
+            for i, r in enumerate(regs):
+                if str(r[0]) == str(num_cuenta):
+                    idx_reg = i
+                    break
+            if idx_reg is None:
+                return
+
+            win = tk.Toplevel(self)
+            win.title('Editar impuesto')
+            ttk.Label(win, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
+            e_c = ttk.Entry(win, style='Field.TEntry')
+            e_c.grid(row=0, column=1, padx=5, pady=2)
+            e_c.insert(0, vals[0])
+            ttk.Label(win, text='%DByCR Banc.:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
+            e_d = ttk.Entry(win, style='Field.TEntry')
+            e_d.grid(row=1, column=1, padx=5, pady=2)
+            e_d.insert(0, vals[2])
+
+            def guardar():
+                try:
+                    regs[idx_reg] = (e_c.get(), float(e_d.get()))
+                    overwrite_records(full_path, regs)
+                    aplicar_filtros_tax_pagos()
+                    win.destroy()
+                except ValueError:
+                    messagebox.showerror('Error', 'Valores inválidos')
+
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
+
+        boton_edit.config(command=editar_tax_pagos)
+
         # 6) Formulario para agregar nuevo registro (row=4)
         f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=4, column=0, columnspan=len(cols), sticky='ew', pady=(10,0))
+        f2.grid(row=2, column=0, sticky='ew', pady=(10,0))
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1, padx=(5,20))
         ttk.Label(f2, text='%DByCR Banc.:').grid(row=0, column=2)
