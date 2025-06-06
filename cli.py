@@ -27,7 +27,6 @@ def build_styles(root):
     style.configure('Header.TLabel', font=('Segoe UI', 14))
     return style
 
-
 class PlaceholderEntry(ttk.Entry):
     """Entry widget with placeholder text support."""
 
@@ -254,7 +253,6 @@ class App(tk.Tk):
 
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
-
         filtro_entrys = {}
         for col_index, col_name in enumerate(headers):
             ent = PlaceholderEntry(filtro_frame, placeholder=col_name, style='Field.TEntry')
@@ -396,7 +394,6 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=len(headers), column=0, columnspan=2, pady=10)
 
         boton_editar.config(command=editar_seleccionado)
-
 
 
 
