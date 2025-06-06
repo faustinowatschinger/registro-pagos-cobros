@@ -731,9 +731,6 @@ class App(tk.Tk):
 
         ttk.Label(taxf, text='% IIBB:', style='Field.TLabel').grid(row=0, column=0, sticky='e')
         e_iibb = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
-        e_iibb.grid(row=0, column=1, sticky='w', padx=(5,15))
-    
-        ttk.Label(taxf, text='% DByCR:', style='Field.TLabel').grid(row=0, column=2, sticky='e')
         e_iibb.grid(row=0, column=1, sticky='w', padx=(5,10))
         ttk.Label(taxf, text='Importe:', style='Field.TLabel').grid(row=0, column=2, sticky='e')
         l_iibb = ttk.Label(taxf, text='0.00', style='Field.TLabel')
@@ -741,7 +738,6 @@ class App(tk.Tk):
 
         ttk.Label(taxf, text='% DByCR:', style='Field.TLabel').grid(row=1, column=0, sticky='e')
         e_dby = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
-
         e_dby.grid(row=1, column=1, sticky='w', padx=(5,10))
         ttk.Label(taxf, text='Importe:', style='Field.TLabel').grid(row=1, column=2, sticky='e')
         l_dby = ttk.Label(taxf, text='0.00', style='Field.TLabel')
@@ -749,6 +745,10 @@ class App(tk.Tk):
 
         ttk.Label(taxf, text='% IVA:', style='Field.TLabel').grid(row=2, column=0, sticky='e')
         e_iva = ttk.Entry(taxf, style='Field.TEntry', width=10, state='readonly')
+        e_iva.grid(row=2, column=1, sticky='w', padx=(5,10))
+        ttk.Label(taxf, text='Importe:', style='Field.TLabel').grid(row=2, column=2, sticky='e')
+        l_iva = ttk.Label(taxf, text='0.00', style='Field.TLabel')
+        l_iva.grid(row=2, column=3, sticky='w', padx=(5,15))
 
         # — 5.3) CAJA O CUENTA BANCARIA DONDE INGRESA EL PAGO —
         ttk.Label(
@@ -1175,7 +1175,7 @@ class App(tk.Tk):
                 e_iva_pct.config(state='readonly')
 
                 # 6) Total con impuestos = neto + IVA + DByCR
-                total_imp = neto_val + monto_dbcr
+                total_imp = neto_val + monto_iva + monto_dbcr
                 l_total_imp.config(text=f"{total_imp:.2f}")
             except Exception:
                 pass
@@ -1206,6 +1206,7 @@ class App(tk.Tk):
         # 2) Calcular montos de impuestos sobre el neto
         base_sin_iva = monto_neto / 1.21 if monto_neto else 0.0
         monto_iva_val  = monto_neto - base_sin_iva
+        monto_dbcr_val = monto_neto * (pct_dbcr / 100)
 
         # 3) Crear objeto pago con los valores en pesos
         p = pago(
