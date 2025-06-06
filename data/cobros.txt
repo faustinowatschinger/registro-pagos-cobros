@@ -1,0 +1,1 @@
+(1, '04/06/2025', 'Fernandez Candela y Sanchez Alan', '09-04b', '21-20-100', 'F3°, Luz Cobr-Fernandez Candela y Sanchez Alan', 150000.0, '', '', 0.0, '', '', 0.0, '11-10-021', 150000.0, '', 0.0, 0.0, 7500.0, 26033.05785123966, '')

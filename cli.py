@@ -675,8 +675,6 @@ class App(tk.Tk):
         ca = ttk.Entry(box_ab, style='Field.TEntry', width=12); ca.grid(row=0, column=1, padx=5)
         ttk.Label(box_ab, text='Detalle A:', style='Field.TLabel').grid(row=0, column=2, padx=10)
         da = ttk.Entry(box_ab, style='Field.TEntry', width=25, state='readonly'); da.grid(row=0, column=3)
-        da.bind('<Button-1>', lambda e: show_cash_popup(ca, da))
-        da.bind('<FocusOut>', hide_cash_popup_later)
         ttk.Label(box_ab, text='Monto A:', style='Field.TLabel').grid(row=0, column=4, padx=10)
         ma = ttk.Entry(box_ab, style='Field.TEntry', width=10); ma.grid(row=0, column=5)
     
@@ -684,8 +682,6 @@ class App(tk.Tk):
         cb = ttk.Entry(box_ab, style='Field.TEntry', width=12); cb.grid(row=1, column=1, padx=5)
         ttk.Label(box_ab, text='Detalle B:', style='Field.TLabel').grid(row=1, column=2, padx=10, pady=5)
         db = ttk.Entry(box_ab, style='Field.TEntry', width=25, state='readonly'); db.grid(row=1, column=3, pady=5)
-        db.bind('<Button-1>', lambda e: show_cash_popup(cb, db))
-        db.bind('<FocusOut>', hide_cash_popup_later)
         ttk.Label(box_ab, text='Monto B:', style='Field.TLabel').grid(row=1, column=4, padx=10, pady=5)
         mb = ttk.Entry(box_ab, style='Field.TEntry', width=10); mb.grid(row=1, column=5, pady=5)
     
@@ -705,6 +701,83 @@ class App(tk.Tk):
         ca.bind('<KeyRelease>', lambda e: fill_acc(e, da))
         cb.bind('<FocusOut>',  lambda e: fill_acc(e, db))
         cb.bind('<KeyRelease>', lambda e: fill_acc(e, db))
+
+        cash_win = None
+        cash_tree = None
+        cash_hide_id = None
+
+        def hide_cash_popup(event=None):
+            nonlocal cash_win, cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+                cash_hide_id = None
+            if cash_win:
+                cash_win.destroy()
+                cash_win = None
+
+        def hide_cash_popup_later(event=None):
+            nonlocal cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+            cash_hide_id = self.after(150, hide_cash_popup)
+
+        def show_cash_popup(code_entry, name_entry, event=None):
+            nonlocal cash_win, cash_tree
+            taxes = load_tax_cobros()
+            matches = [
+                (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
+                for c in taxes
+            ]
+            if not matches:
+                return
+            if cash_win:
+                cash_win.destroy()
+            cash_win = tk.Toplevel(self)
+            cash_win.wm_overrideredirect(True)
+            cash_win.attributes('-topmost', True)
+            cash_tree = ttk.Treeview(
+                cash_win,
+                columns=('Cod', 'Nombre', '%IIBB', '%DByCR'),
+                show='headings',
+                height=min(len(matches), 5),
+            )
+            for h, w in (('Cod', 100), ('Nombre', 200), ('%IIBB', 60), ('%DByCR', 60)):
+                cash_tree.heading(h, text=h)
+                cash_tree.column(h, width=w, anchor='center')
+            for c, n, p_i, p_d in matches:
+                cash_tree.insert('', 'end', values=(c, n, f"{p_i:.2f}", f"{p_d:.2f}"))
+            cash_tree.pack(expand=True, fill='both')
+            cash_tree.focus_set()
+
+            def choose_cash(ev=None):
+                sel = cash_tree.selection()
+                if sel:
+                    vals = cash_tree.item(sel[0], 'values')
+                    cod, nombre = vals[0], vals[1]
+                    code_entry.delete(0, 'end')
+                    code_entry.insert(0, cod)
+                    name_entry.config(state='normal')
+                    name_entry.delete(0, 'end')
+                    name_entry.insert(0, nombre)
+                    name_entry.config(state='readonly')
+                    code_entry.focus_set()
+                    upd_tot()  # actualizar porcentajes e importes
+                hide_cash_popup()
+
+            cash_tree.bind('<ButtonRelease-1>', choose_cash)
+            cash_tree.bind('<Return>', choose_cash)
+            cash_tree.bind('<Escape>', lambda e: hide_cash_popup())
+            cash_tree.bind('<FocusOut>', hide_cash_popup_later)
+
+            x = name_entry.winfo_rootx()
+            y = name_entry.winfo_rooty() + name_entry.winfo_height()
+            cash_win.geometry(f'+{x}+{y}')
+
+        # Enlazar popups después de definir la lógica
+        da.bind('<Button-1>', lambda e: show_cash_popup(ca, da))
+        da.bind('<FocusOut>', hide_cash_popup_later)
+        db.bind('<Button-1>', lambda e: show_cash_popup(cb, db))
+        db.bind('<FocusOut>', hide_cash_popup_later)
     
             # — 7) Recalcular Totales e Impuestos en cada cambio —
         def upd_tot(e=None):
@@ -736,9 +809,8 @@ class App(tk.Tk):
     
                 # 5) Calcular IVA (21%) **sobre el monto de cada cuenta**, no sobre el subtotal de imputaciones
                 pct_iva = 21.0
-                monto_iva_A = montoA_val * (pct_iva / 100)
-                monto_iva_B = montoB_val * (pct_iva / 100)
-                monto_iva   = monto_iva_A + monto_iva_B
+                base_sin_iva = subtotal_imput / 1.21 if subtotal_imput else 0.0
+                monto_iva = subtotal_imput - base_sin_iva
     
                 # 6) Mostrar los porcentajes combinados (suman de A+B)
                 total_pct_iibb = pA_iibb + pB_iibb
@@ -808,15 +880,21 @@ class App(tk.Tk):
     def _save_cobro(self, fecha, nombre_cli, parcela, imputaciones,
                     cuentaA, montoA, cuentaB, montoB, obs):
         total_imputaciones = sum(imp[2] for imp in imputaciones)
+        montoA_val = float(montoA or 0)
+        montoB_val = float(montoB or 0)
 
+        if round(total_imputaciones, 2) != round(montoA_val + montoB_val, 2):
+            messagebox.showerror(
+                'Error',
+                'La suma de "Monto A" y "Monto B" debe coincidir con el total de imputaciones.'
+            )
+            return
         # Leer porcentajes de cuentaA y cuentaB
         tbl = load_tax_cobros()
         pA_iibb, pA_dbcr = tbl.get(cuentaA.strip(), (0.0, 0.0))
         pB_iibb, pB_dbcr = tbl.get(cuentaB.strip(), (0.0, 0.0))
 
         # Montos de impuestos IIBB / DByCR por cuenta
-        montoA_val  = float(montoA or 0)
-        montoB_val  = float(montoB or 0)
         monto_iibb_A  = montoA_val * (pA_iibb  / 100)
         monto_dbcr_A  = montoA_val * (pA_dbcr  / 100)
         monto_iibb_B  = montoB_val * (pB_iibb  / 100)
@@ -827,9 +905,8 @@ class App(tk.Tk):
 
         # IVA 21% **sobre montoA y montoB**, no sobre total de imputaciones
         pct_iva = 21.0
-        iva_A = montoA_val * (pct_iva / 100)
-        iva_B = montoB_val * (pct_iva / 100)
-        iva_val = iva_A + iva_B
+        base_sin_iva = total_imputaciones / 1.21 if total_imputaciones else 0.0
+        iva_val = total_imputaciones - base_sin_iva
 
         # Construir el objeto cobro con los impuestos ya en pesos
         c = cobro(
@@ -990,7 +1067,8 @@ class App(tk.Tk):
 
                 # 3) Calcular IVA (21%) sobre el neto
                 pct_iva = 21.0
-                monto_iva = neto_val * (pct_iva / 100)
+                base_sin_iva = neto_val / 1.21 if neto_val else 0.0
+                monto_iva = neto_val - base_sin_iva
 
                 # 4) Calcular Monto DByCR bancario
                 monto_dbcr = neto_val * (pct_dbcr / 100)
@@ -1007,7 +1085,7 @@ class App(tk.Tk):
                 e_iva_pct.config(state='readonly')
 
                 # 6) Total con impuestos = neto + IVA + DByCR
-                total_imp = neto_val + monto_iva + monto_dbcr
+                total_imp = neto_val + monto_dbcr
                 l_total_imp.config(text=f"{total_imp:.2f}")
             except Exception:
                 pass
@@ -1036,8 +1114,8 @@ class App(tk.Tk):
         pct_dbcr = tblp.get(cod_paga.strip(), 0.0)
 
         # 2) Calcular montos de impuestos sobre el neto
-        monto_dbcr_val = monto_neto * (pct_dbcr / 100)
-        monto_iva_val  = monto_neto * (21.0 / 100)
+        base_sin_iva = monto_neto / 1.21 if monto_neto else 0.0
+        monto_iva_val  = monto_neto - base_sin_iva
 
         # 3) Crear objeto pago con los valores en pesos
         p = pago(
