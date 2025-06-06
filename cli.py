@@ -39,6 +39,10 @@ class PlaceholderEntry(ttk.Entry):
         self.bind("<FocusOut>", self._show)
         self._show()
 
+    def get(self):
+        val = super().get()
+        return "" if self._ph_visible else val
+
     def _show(self, event=None):
         if not self.get():
             self._ph_visible = True
@@ -250,7 +254,6 @@ class App(tk.Tk):
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(headers), sticky='ew')
-        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
 
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
@@ -267,6 +270,7 @@ class App(tk.Tk):
 
         vsb = ttk.Scrollbar(table, orient='vertical')
         hsb = ttk.Scrollbar(table, orient='horizontal')
+        filtro_canvas.configure(xscrollcommand=hsb.set)
 
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
@@ -1360,7 +1364,6 @@ class App(tk.Tk):
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
 
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
@@ -1377,6 +1380,7 @@ class App(tk.Tk):
 
         vsb = ttk.Scrollbar(table, orient='vertical')
         hsb = ttk.Scrollbar(table, orient='horizontal')
+        filtro_canvas.configure(xscrollcommand=hsb.set)
 
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
@@ -1549,7 +1553,6 @@ class App(tk.Tk):
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
 
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
@@ -1573,6 +1576,7 @@ class App(tk.Tk):
 
         vsb = ttk.Scrollbar(table, orient='vertical')
         hsb = ttk.Scrollbar(table, orient='horizontal')
+        filtro_canvas.configure(xscrollcommand=hsb.set)
 
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
@@ -1769,7 +1773,6 @@ class App(tk.Tk):
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-        filtro_canvas.configure(xscrollcommand=lambda *a: hsb.set(*a))
 
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
@@ -1792,6 +1795,7 @@ class App(tk.Tk):
 
         vsb = ttk.Scrollbar(table, orient='vertical')
         hsb = ttk.Scrollbar(table, orient='horizontal')
+        filtro_canvas.configure(xscrollcommand=hsb.set)
 
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
