@@ -5,13 +5,14 @@ from tkinter import ttk, messagebox
 import datetime
 
 from model import cobro, pago, cliente
+import storage
 from storage import (
     save_cobros, save_pagos, save_clients,
     load_plan_cuentas, load_tax_cobros, save_tax_cobros,
     load_tax_pagos, save_tax_pagos,
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
-    ensure_data_directory, load_expensas, save_espensas,
+    save_expensas
 )
 
 BRANCH_CODE = "0001"
@@ -142,7 +143,7 @@ class App(tk.Tk):
             str(pc[0]): pc[1]
             for pc in load_plan_cuentas()
         }
-
+        self.expensas = storage.load_expensas()
 
     def _build_ui(self):
         # Contenedor lateral de navegación
@@ -2117,7 +2118,7 @@ class App(tk.Tk):
         ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
-        exp_dict = load_expensas()
+        exp_dict = storage.load_expensas()
         regs = [(c, *exp_dict[c]) for c in exp_dict]
         # [(cuenta, mes, saldo), ...]
 
@@ -2240,7 +2241,7 @@ class App(tk.Tk):
             cuenta = vals[0]
             if not messagebox.askyesno('Confirmar', f'¿Eliminar registro de {cuenta}?'):
                 return
-            d = load_expensas()
+            d = storage.load_expensas()
             if cuenta in d:
                 d.pop(cuenta)
                 save_expensas(d)
@@ -2285,7 +2286,7 @@ class App(tk.Tk):
                 except ValueError:
                     messagebox.showerror('Error', 'Saldo inválido')
                     return
-                d = load_expensas()
+                d = storage.load_expensas()
                 if cuenta != cuenta_n and cuenta in d:
                     d.pop(cuenta)
                 d[cuenta_n] = [mes_n, saldo_n]
