@@ -1010,6 +1010,8 @@ class App(tk.Tk):
         monto_iibb = monto_iibb_A + monto_iibb_B
         monto_dbcr = monto_dbcr_A + monto_dbcr_B
 
+        # Mantener saldos de expensas al día antes de aplicar pagos
+        update_expensas(self.plan)
         # IVA 21% **sobre montoA y montoB**, no sobre total de imputaciones
         pct_iva = 21.0
         base_sin_iva = total_imputaciones / 1.21 if total_imputaciones else 0.0
