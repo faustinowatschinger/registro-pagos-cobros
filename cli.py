@@ -1045,8 +1045,20 @@ class App(tk.Tk):
         cont.place(relx=0.5, rely=0.5, anchor='center')
 
         # 3) Título
-        ttk.Label(cont, text='Registro Egreso', style='Title.TLabel')\
-            .pack(pady=(0,20))
+        ttk.Label(cont, text='Registro Egreso', style='Title.TLabel').pack(pady=(0,20))
+
+        # --- Encabezado (igual que en Registro Cobros) ---
+        header = ttk.Frame(cont, padding=(0,10))
+        header.pack(fill='x')
+        left = ttk.Frame(header)
+        left.pack(side='left', padx=5)
+        ttk.Label(left, text='BIOCULTIVOS SAS', style='Title.TLabel').pack(anchor='w')
+        ttk.Label(left, text='CUIT 30-71841359-8', style='Header.TLabel').pack(anchor='w')
+        right = ttk.Frame(header)
+        right.pack(side='right', padx=5)
+        ttk.Label(right, text='Condominio El Michay', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='Chacra 032-E-007-01C', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='General Fernández Oro (R.N.)', style='Header.TLabel').pack(anchor='e')
 
         # 4) Fecha y Número de Pago
         sec1 = ttk.Frame(cont, padding=5)
@@ -1180,19 +1192,20 @@ class App(tk.Tk):
         l_total = ttk.Label(sec3, text='0.00', style='Field.TLabel')
         l_total.grid(row=5, column=2, sticky='w')
 
-        # --- Fila “paga” (cuenta que paga / impuestos) ---
-        ttk.Label(sec3, text='Cuenta Pagadora', style='Field.TLabel', borderwidth=1, relief='solid')\
-           .grid(row=6, column=0, sticky='nsew', padx=1)
-        ttk.Label(sec3, text='Denominación', style='Field.TLabel', borderwidth=1, relief='solid')\
-           .grid(row=6, column=1, sticky='nsew', padx=1)
-        ttk.Label(sec3, text='Imp. a Pagar %', style='Field.TLabel', borderwidth=1, relief='solid')\
-           .grid(row=6, column=2, sticky='nsew', padx=1)
+        # --- Cuenta desde donde se paga ---
+        ttk.Label(cont, text='CAJA O CUENTA BANCARIA DESDE DONDE SE PAGA', style='Field.TLabel').pack(fill='x', pady=(5,0))
+        sec4 = ttk.Frame(cont, padding=5)
+        sec4.pack(fill='x', pady=(0,10))
+        for j, h in enumerate(['Cuenta Pagadora','Denominación','Imp. a Pagar %']):
+            ttk.Label(sec4, text=h, style='Field.TLabel', borderwidth=1, relief='solid')\
+               .grid(row=0, column=j, sticky='nsew', padx=1)
+            sec4.columnconfigure(j, weight=1)
 
-        pago_cuenta = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
-        pago_cuenta.grid(row=7, column=0, sticky='nsew', padx=1, pady=2)
+        pago_cuenta = ttk.Entry(sec4, style='Field.TEntry', state='readonly')
+        pago_cuenta.grid(row=1, column=0, sticky='nsew', padx=1, pady=2)
 
         pago_denom_var = tk.StringVar()
-        pago_denom = ttk.Combobox(sec3, textvariable=pago_denom_var, state='readonly', style='Field.TEntry')
+        pago_denom = ttk.Combobox(sec4, textvariable=pago_denom_var, state='readonly', style='Field.TEntry')
         pay_codes = []
         pay_names = []
         for i in range(1,31):
@@ -1203,23 +1216,22 @@ class App(tk.Tk):
                 pay_names.append(name)
         code_by_name = {n: c for c, n in zip(pay_codes, pay_names)}
         pago_denom['values'] = pay_names
-        pago_denom.grid(row=7, column=1, sticky='nsew', padx=1, pady=2)
+        pago_denom.grid(row=1, column=1, sticky='nsew', padx=1, pady=2)
 
-        # — Campos de DByCR e IVA —
-        e_dbcr_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
-        e_dbcr_pct.grid(row=7, column=2, sticky='w', padx=(1,0))
-        ttk.Label(sec3, text='Monto DByCR:', style='Field.TLabel')\
-           .grid(row=8, column=0, sticky='e', padx=(5,1))
-        l_dbcr = ttk.Label(sec3, text='0.00', style='Field.TLabel')
-        l_dbcr.grid(row=8, column=1, sticky='w')
+        e_dbcr_pct = ttk.Entry(sec4, style='Field.TEntry', width=10, state='readonly')
+        e_dbcr_pct.grid(row=1, column=2, sticky='w', padx=(1,0))
+        ttk.Label(sec4, text='Monto DByCR:', style='Field.TLabel')\
+           .grid(row=2, column=0, sticky='e', padx=(5,1))
+        l_dbcr = ttk.Label(sec4, text='0.00', style='Field.TLabel')
+        l_dbcr.grid(row=2, column=1, sticky='w')
 
-        ttk.Label(sec3, text='% IVA:', style='Field.TLabel')\
-           .grid(row=9, column=0, sticky='e', padx=(5,1))
-        e_iva_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
-        e_iva_pct.grid(row=9, column=1, sticky='w', padx=(1,0))
+        ttk.Label(sec4, text='% IVA:', style='Field.TLabel')\
+           .grid(row=3, column=0, sticky='e', padx=(5,1))
+        e_iva_pct = ttk.Entry(sec4, style='Field.TEntry', width=10, state='readonly')
+        e_iva_pct.grid(row=3, column=1, sticky='w', padx=(1,0))
 
         # espacio extra inferior
-        ttk.Label(sec3, text='').grid(row=10, column=0, pady=(5,0))
+        ttk.Label(sec4, text='').grid(row=4, column=0, pady=(5,0))
 
         # 7) Autocompletar denominaciones y calcular impuestos
         def fill_imput(e):
