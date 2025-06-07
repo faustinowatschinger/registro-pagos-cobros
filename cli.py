@@ -1183,39 +1183,43 @@ class App(tk.Tk):
         # --- Fila “paga” (cuenta que paga / impuestos) ---
         ttk.Label(sec3, text='Cuenta Pagadora', style='Field.TLabel', borderwidth=1, relief='solid')\
            .grid(row=6, column=0, sticky='nsew', padx=1)
+        ttk.Label(sec3, text='Denominación', style='Field.TLabel', borderwidth=1, relief='solid')\
+           .grid(row=6, column=1, sticky='nsew', padx=1)
+        ttk.Label(sec3, text='Imp. a Pagar %', style='Field.TLabel', borderwidth=1, relief='solid')\
+           .grid(row=6, column=2, sticky='nsew', padx=1)
 
-        pago_cuenta_var = tk.StringVar()
-        pago_cuenta = ttk.Combobox(sec3, textvariable=pago_cuenta_var, state='readonly', style='Field.TEntry')
-        pay_opts = []
+        pago_cuenta = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
+        pago_cuenta.grid(row=7, column=0, sticky='nsew', padx=1, pady=2)
+
+        pago_denom_var = tk.StringVar()
+        pago_denom = ttk.Combobox(sec3, textvariable=pago_denom_var, state='readonly', style='Field.TEntry')
+        pay_codes = []
+        pay_names = []
         for i in range(1,31):
             code = f"11-10-{i:03d}"
             name = self.plan.get(code)
             if name:
-                pay_opts.append(f"{code} {name}")
-        pago_cuenta['values'] = pay_opts
-        pago_cuenta.grid(row=7, column=0, sticky='nsew', padx=1, pady=2)
-
-        pago_denom = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
+                pay_codes.append(code)
+                pay_names.append(name)
+        code_by_name = {n: c for c, n in zip(pay_codes, pay_names)}
+        pago_denom['values'] = pay_names
         pago_denom.grid(row=7, column=1, sticky='nsew', padx=1, pady=2)
 
         # — Campos de DByCR e IVA —
-        ttk.Label(sec3, text='DByCR:', style='Field.TLabel')\
-           .grid(row=8, column=0, sticky='e', padx=(5,1))
         e_dbcr_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
-        e_dbcr_pct.grid(row=8, column=1, sticky='w', padx=(1,0))
+        e_dbcr_pct.grid(row=7, column=2, sticky='w', padx=(1,0))
+        ttk.Label(sec3, text='Monto DByCR:', style='Field.TLabel')\
+           .grid(row=8, column=0, sticky='e', padx=(5,1))
         l_dbcr = ttk.Label(sec3, text='0.00', style='Field.TLabel')
-        l_dbcr.grid(row=8, column=2, sticky='w')
+        l_dbcr.grid(row=8, column=1, sticky='w')
 
         ttk.Label(sec3, text='% IVA:', style='Field.TLabel')\
            .grid(row=9, column=0, sticky='e', padx=(5,1))
         e_iva_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
         e_iva_pct.grid(row=9, column=1, sticky='w', padx=(1,0))
 
-        # — Campo de Total con Impuestos —
-        ttk.Label(sec3, text='TOTAL c/ Impuestos:', style='Field.TLabel')\
-           .grid(row=10, column=1, sticky='e', pady=(10,0))
-        l_total_imp = ttk.Label(sec3, text='0.00', style='Field.TLabel')
-        l_total_imp.grid(row=10, column=2, columnspan=2, sticky='w', pady=(10,0), padx=(5,0))
+        # espacio extra inferior
+        ttk.Label(sec3, text='').grid(row=10, column=0, pady=(5,0))
 
         # 7) Autocompletar denominaciones y calcular impuestos
         def fill_imput(e):
@@ -1230,16 +1234,15 @@ class App(tk.Tk):
         imput_cuenta.bind('<KeyRelease>', fill_imput)
 
         def fill_pago(e):
-            val = pago_cuenta_var.get()
-            code = val.split()[0] if val else ''
-            name = self.plan.get(code, '')
-            pago_denom.config(state='normal')
-            pago_denom.delete(0, 'end')
-            pago_denom.insert(0, name)
-            pago_denom.config(state='readonly')
+            name = pago_denom_var.get()
+            code = code_by_name.get(name, '')
+            pago_cuenta.config(state='normal')
+            pago_cuenta.delete(0, 'end')
+            pago_cuenta.insert(0, code)
+            pago_cuenta.config(state='readonly')
             upd_tot()
 
-        pago_cuenta.bind('<<ComboboxSelected>>', fill_pago)
+        pago_denom.bind('<<ComboboxSelected>>', fill_pago)
 
         def upd_tot(e=None):
             try:
@@ -1255,8 +1258,7 @@ class App(tk.Tk):
                 total_val = neto_val + iva_val
 
                 tblp = load_tax_pagos()
-                val = pago_cuenta_var.get()
-                code = val.split()[0] if val else ''
+                code = pago_cuenta.get().strip()
                 pct_dbcr = tblp.get(code, 0.0)
 
                 pct_iva = 21.0
@@ -1274,7 +1276,6 @@ class App(tk.Tk):
 
                 l_total.config(text=f"{total_val:.2f}")
                 l_dbcr.config(text=f"{monto_dbcr:.2f}")
-                l_total_imp.config(text=f"{total_val + monto_dbcr:.2f}")
             except Exception:
                 pass
 
@@ -1294,7 +1295,7 @@ class App(tk.Tk):
                            imput_cuenta.get().strip(),       # cuenta imputación (sin impuesto)
                            float(imput_imp.get() or 0),      # monto neto
                            float(iva_imp.get() or 0),        # IVA de la factura
-                           pago_cuenta_var.get().split()[0] if pago_cuenta_var.get() else '',
+                           pago_cuenta.get().strip(),
                            None
                        )
                    )).pack(pady=15)
