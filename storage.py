@@ -1,6 +1,6 @@
 # storage.py
 
-import os, ast
+import os, ast, datetime
 from model import cobro, pago, cliente
 
 def ensure_data_directory():
@@ -146,3 +146,53 @@ def save_tax_pagos(tax_tuple):
         for num, pct_dbcr in tax_tuple:
             f.write(repr((num, pct_dbcr)) + "\n")
     return True
+
+# --- Expensas -------------------------------------------------
+
+EXPENSAS_FILE = 'expensas.txt'
+
+def load_expensas():
+    """Return dict {cuenta: [mes, saldo]}"""
+    path = os.path.join(ensure_data_directory(), EXPENSAS_FILE)
+    data = {}
+    if os.path.exists(path):
+        for line in open(path, 'r', encoding='utf-8'):
+            if not line.strip():
+                continue
+            cuenta, mes, saldo = ast.literal_eval(line)
+            data[str(cuenta)] = [str(mes), float(saldo)]
+    return data
+
+def save_expensas(exp_dict):
+    path = os.path.join(ensure_data_directory(), EXPENSAS_FILE)
+    with open(path, 'w', encoding='utf-8') as f:
+        for cuenta, (mes, saldo) in exp_dict.items():
+            f.write(repr((cuenta, mes, saldo)) + "\n")
+    return True
+
+def update_expensas(plan_dict):
+    """Ensure expensa balances are updated for the current month."""
+    exps = load_expensas()
+    cur_month = datetime.date.today().strftime('%Y-%m')
+    updated = False
+    for acc in plan_dict:
+        if not str(acc).startswith('11-21-'):
+            continue
+        if acc not in exps:
+            exps[acc] = [cur_month, -189000.0]
+            updated = True
+        else:
+            last_month, saldo = exps[acc]
+            if cur_month > last_month:
+                exps[acc] = [cur_month, saldo - 189000.0]
+                updated = True
+    if updated:
+        save_expensas(exps)
+
+def apply_payment_expensa(cuenta, amount):
+    exps = load_expensas()
+    if cuenta not in exps:
+        return
+    mes, saldo = exps[cuenta]
+    exps[cuenta] = [mes, saldo + float(amount)]
+    save_expensas(exps)
