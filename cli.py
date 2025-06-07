@@ -11,7 +11,7 @@ from storage import (
     load_tax_pagos, save_tax_pagos,
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
-    ensure_data_directory, load_expensas, save_espensas,
+    ensure_data_directory
 )
 
 BRANCH_CODE = "0001"
