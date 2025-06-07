@@ -112,7 +112,7 @@ class App(tk.Tk):
         for name in [
             'cobro', 'pago', 'cliente',
             'lst_cobros', 'lst_pagos', 'lst_clientes',
-            'plan', 'tax_cobros', 'tax_pagos'
+            'plan', 'tax_cobros', 'tax_pagos', 'expensas'
         ]:
             self.frames[name] = ttk.Frame(self.content)
 
@@ -126,6 +126,7 @@ class App(tk.Tk):
         self._build_plan(self.frames['plan'])
         self._build_tax_cobros(self.frames['tax_cobros'])
         self._build_tax_pagos(self.frames['tax_pagos'])
+        self._build_expensas(self.frames['expensas'])
 
         # 4) Al arrancar, muestro sólo la vista "cobro"
         self._show_frame('cobro')
@@ -159,6 +160,7 @@ class App(tk.Tk):
             ('Plan Ctas', 'plan'),
             ('Imp. Cobros', 'tax_cobros'),
             ('Imp. Pagos',  'tax_pagos'),
+            ('Expensas',   'expensas'),
         ]
         for txt, name in pages:
             ttk.Button(
@@ -186,8 +188,10 @@ class App(tk.Tk):
             self._build_tax_cobros(self.frames[name])
         elif name == 'tax_pagos':
             self._build_tax_pagos(self.frames[name])
-        elif name == 'plan':                      
+        elif name == 'plan':
             self._build_plan(self.frames[name])
+        elif name == 'expensas':
+            self._build_expensas(self.frames[name])
 
         # 3) Finalmente, empaco (pack) solo el frame que quiero mostrar
         self.frames[name].pack(expand=True, fill='both')
@@ -2105,6 +2109,197 @@ class App(tk.Tk):
                 self._show_frame('tax_pagos')
             )
         ).grid(row=1, column=0, columnspan=4, pady=(10,0))
+
+    def _build_expensas(self, parent):
+        for w in parent.winfo_children():
+            w.destroy()
+
+        ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
+
+        full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
+        exp_dict = load_expensas()
+        regs = [(c, *exp_dict[c]) for c in exp_dict]
+        # [(cuenta, mes, saldo), ...]
+
+        if not regs:
+            ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
+            return
+
+        cols = ['Cuenta', 'Nombre', 'Mes', 'Saldo']
+
+        cont = ttk.Frame(parent, padding=5)
+        cont.pack(expand=True, fill='both')
+        cont.grid_columnconfigure(0, weight=1)
+
+        table_canvas = tk.Canvas(cont, highlightthickness=0)
+        table_canvas.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+
+        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        hsb.grid(row=1, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+
+        table = ttk.Frame(table_canvas)
+        table_canvas.create_window((0, 0), window=table, anchor='nw')
+        table.bind(
+            '<Configure>',
+            lambda e: table_canvas.configure(scrollregion=table_canvas.bbox('all'))
+        )
+
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
+
+        filtro_entrys = {}
+        for idx, col in enumerate(cols):
+            ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
+            ent.grid(row=0, column=idx, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(idx, weight=1)
+            filtro_entrys[idx] = ent
+
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
+        vsb = ttk.Scrollbar(table, orient='vertical')
+        filtro_canvas.configure(xscrollcommand=hsb.set)
+
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            table_canvas.xview_moveto(args[0])
+            hsb.set(*args)
+
+        tree = ttk.Treeview(
+            table,
+            columns=cols,
+            show='headings',
+            yscrollcommand=vsb.set,
+            xscrollcommand=_tree_xview
+        )
+        vsb.config(command=tree.yview)
+
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+            table_canvas.xview(*args)
+
+        hsb.config(command=_scroll_x)
+
+        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
+        vsb.grid(row=1, column=len(cols), sticky='ns')
+        table.grid_rowconfigure(1, weight=1)
+
+        for c in cols:
+            tree.heading(c, text=c, anchor='center')
+            tree.column(c, width=130, anchor='center')
+
+        def poblar_exp(lista):
+            for item in tree.get_children():
+                tree.delete(item)
+            for cuenta, mes, saldo in lista:
+                nombre = self.plan.get(cuenta, '')
+                tree.insert('', 'end', values=(cuenta, nombre, mes, saldo))
+
+        poblar_exp(regs)
+
+        def aplicar_filtros_exp(event=None):
+            filtros = {i: e.get() for i, e in filtro_entrys.items()}
+            filtrados = []
+            for row in regs:
+                cuenta, mes, saldo = row
+                nombre = self.plan.get(cuenta, '')
+                cells = [cuenta, nombre, mes, str(saldo)]
+                match = True
+                for idx, txt in filtros.items():
+                    if not txt.strip():
+                        continue
+                    if txt.lower() not in str(cells[idx]).lower():
+                        match = False
+                        break
+                if match:
+                    filtrados.append(row)
+            poblar_exp(filtrados)
+
+        for ent in filtro_entrys.values():
+            ent.bind('<KeyRelease>', aplicar_filtros_exp)
+
+        btn_frame = ttk.Frame(cont)
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(5,0))
+        btn_del = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
+        btn_del.grid(row=0, column=0, padx=5)
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
+        btn_edit.grid(row=0, column=1, padx=5)
+
+        def eliminar_exp():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            vals = tree.item(sel[0], 'values')
+            cuenta = vals[0]
+            if not messagebox.askyesno('Confirmar', f'¿Eliminar registro de {cuenta}?'):
+                return
+            d = load_expensas()
+            if cuenta in d:
+                d.pop(cuenta)
+                save_expensas(d)
+            nonlocal regs
+            regs = [(c, *d[c]) for c in d]
+            self._load_data()
+            poblar_exp(regs)
+
+        btn_del.config(command=eliminar_exp)
+
+        def editar_exp():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            vals = tree.item(sel[0], 'values')
+            cuenta = vals[0]
+            idx_reg = None
+            for i, r in enumerate(regs):
+                if str(r[0]) == str(cuenta):
+                    idx_reg = i
+                    break
+            if idx_reg is None:
+                return
+
+            orig = list(regs[idx_reg])
+
+            win = tk.Toplevel(self)
+            win.title('Editar expensa')
+            for i, col in enumerate(['Cuenta', 'Mes', 'Saldo']):
+                ttk.Label(win, text=col+':', style='Field.TLabel').grid(row=i, column=0, sticky='e', padx=5, pady=2)
+                e = ttk.Entry(win, style='Field.TEntry')
+                e.grid(row=i, column=1, padx=5, pady=2)
+                e.insert(0, orig[i])
+                orig[i] = e
+
+            def guardar():
+                cuenta_n = orig[0].get().strip()
+                mes_n = orig[1].get().strip()
+                try:
+                    saldo_n = float(orig[2].get())
+                except ValueError:
+                    messagebox.showerror('Error', 'Saldo inválido')
+                    return
+                d = load_expensas()
+                if cuenta != cuenta_n and cuenta in d:
+                    d.pop(cuenta)
+                d[cuenta_n] = [mes_n, saldo_n]
+                save_expensas(d)
+                nonlocal regs
+                regs = [(c, *d[c]) for c in d]
+                self._load_data()
+                poblar_exp(regs)
+                win.destroy()
+
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
+
+        btn_edit.config(command=editar_exp)
+        tree.bind('<Double-1>', lambda e: editar_exp())
 
 if __name__ == '__main__':
     App().mainloop()
