@@ -1113,16 +1113,23 @@ class App(tk.Tk):
            .grid(row=2, column=2, sticky='w')
 
         # --- Fila IVA crédito ---
-        ttk.Label(sec3, text='IVA Crédito', style='Field.TLabel')\
-           .grid(row=3, column=0, columnspan=3, sticky='w', pady=(10,0))
+        headers_iva = ['IVA Crédito', 'Denominación', 'IVA de la factura']
+        for j, h in enumerate(headers_iva):
+            ttk.Label(
+                sec3, text=h, style='Field.TLabel',
+                borderwidth=1, relief='solid'
+            ).grid(row=3, column=j, sticky='nsew', padx=1, pady=(10,0))
+
         iva_cuenta = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
         iva_cuenta.grid(row=4, column=0, sticky='nsew', padx=1, pady=2)
         iva_cuenta.insert(0, '11-40-001')
+
         iva_denom = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
         iva_denom.grid(row=4, column=1, sticky='nsew', padx=1, pady=2)
         iva_denom.config(state='normal')
         iva_denom.insert(0, self.plan.get('11-40-001', ''))
         iva_denom.config(state='readonly')
+
         iva_imp = ttk.Entry(sec3, style='Field.TEntry')
         iva_imp.grid(row=4, column=2, sticky='nsew', padx=1, pady=2)
 
