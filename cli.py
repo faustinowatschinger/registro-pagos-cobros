@@ -408,6 +408,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=len(headers), column=0, columnspan=2, pady=10)
 
         boton_editar.config(command=editar_seleccionado)
+        tree.bind('<Double-1>', lambda e: editar_seleccionado())
 
 
 
@@ -1626,6 +1627,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
 
         btn_edit.config(command=editar_plan)
+        tree.bind('<Double-1>', lambda e: editar_plan())
 
         # Formulario para agregar nuevas cuentas (row=5)
         frm2 = ttk.Frame(cont, padding=5)
@@ -1858,6 +1860,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
 
         boton_edit.config(command=editar_tax_cobros)
+        tree.bind('<Double-1>', lambda e: editar_tax_cobros())
 
         # 12) Formulario “Agregar” (row=4)
         f2 = ttk.Frame(cont, padding=5)
@@ -2083,6 +2086,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
 
         boton_edit.config(command=editar_tax_pagos)
+        tree.bind('<Double-1>', lambda e: editar_tax_pagos())
 
         # 6) Formulario para agregar nuevo registro (row=4)
         f2 = ttk.Frame(cont, padding=5)
