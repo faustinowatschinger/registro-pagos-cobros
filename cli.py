@@ -11,8 +11,7 @@ from storage import (
     load_tax_pagos, save_tax_pagos,
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
-    ensure_data_directory,
-    update_expensas, apply_payment_expensa
+    ensure_data_directory
 )
 
 BRANCH_CODE = "0001"
@@ -142,7 +141,6 @@ class App(tk.Tk):
             str(pc[0]): pc[1]
             for pc in load_plan_cuentas()
         }
-        update_expensas(self.plan)
 
 
     def _build_ui(self):
@@ -1006,10 +1004,6 @@ class App(tk.Tk):
 
         monto_iibb = monto_iibb_A + monto_iibb_B
         monto_dbcr = monto_dbcr_A + monto_dbcr_B
-
-        for code, _, imp in imputaciones:
-            if str(code).startswith('11-21-'):
-                apply_payment_expensa(code.strip(), imp)
 
         # IVA 21% **sobre montoA y montoB**, no sobre total de imputaciones
         pct_iva = 21.0
