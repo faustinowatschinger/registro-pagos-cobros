@@ -1059,6 +1059,48 @@ class App(tk.Tk):
         fecha_entry = ttk.Entry(sec1, style='Field.TEntry', width=15)
         fecha_entry.grid(row=0, column=1, sticky='w')
 
+        def formatear_ddmmyyyy(s):
+            if len(s) > 8:
+                s = s[:8]
+            if len(s) < 3:
+                return s
+            if len(s) < 5:
+                return s[:2] + '/' + s[2:]
+            return s[:2] + '/' + s[2:4] + '/' + s[4:]
+
+        hoy = datetime.date.today()
+        raw_inicial = hoy.strftime('%d%m%Y')
+        texto_inicial = formatear_ddmmyyyy(raw_inicial)
+        fecha_entry.insert(0, texto_inicial)
+
+        def on_keyrelease_fecha(event):
+            antiguo = fecha_entry.get()
+            pos_orig = fecha_entry.index('insert')
+            dig_antes = 0
+            for ch in antiguo[:pos_orig]:
+                if ch.isdigit():
+                    dig_antes += 1
+            raw_nuevo = ''.join(filter(str.isdigit, antiguo))
+            if len(raw_nuevo) > 8:
+                raw_nuevo = raw_nuevo[:8]
+            nuevo_texto = formatear_ddmmyyyy(raw_nuevo)
+            if dig_antes == 0:
+                nueva_pos = 0
+            else:
+                cont = 0
+                nueva_pos = len(nuevo_texto)
+                for i, ch in enumerate(nuevo_texto):
+                    if ch.isdigit():
+                        cont += 1
+                    if cont == dig_antes:
+                        nueva_pos = i + 1
+                        break
+            fecha_entry.delete(0, 'end')
+            fecha_entry.insert(0, nuevo_texto)
+            fecha_entry.icursor(nueva_pos)
+
+        fecha_entry.bind('<KeyRelease>', on_keyrelease_fecha)
+
         ttk.Label(sec1, text='PAGO N.°:', style='Field.TLabel')\
            .grid(row=0, column=2, sticky='e', padx=(20,5))
         ttk.Label(sec1, text=str(get_next_pago_id()), style='Field.TLabel')\
