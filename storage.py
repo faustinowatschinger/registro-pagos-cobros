@@ -159,7 +159,11 @@ def load_expensas():
         for line in open(path, 'r', encoding='utf-8'):
             if not line.strip():
                 continue
-            cuenta, mes, saldo = ast.literal_eval(line)
+            try:
+                cuenta, mes, saldo = ast.literal_eval(line)
+            except Exception:
+                # Si un registro está corrupto, lo ignoramos
+                continue
             data[str(cuenta)] = [str(mes), float(saldo)]
     return data
 
