@@ -13,8 +13,6 @@ from storage import (
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
     ensure_data_directory
-)
-
 BRANCH_CODE = "0001"
 
 # Estilos globales
@@ -143,7 +141,7 @@ class App(tk.Tk):
             str(pc[0]): pc[1]
             for pc in load_plan_cuentas()
         }
-        self.expensas = storage.load_expensas()
+        storage.update_expensas(self.plan)
 
     def _build_ui(self):
         # Contenedor lateral de navegación
@@ -1012,10 +1010,10 @@ class App(tk.Tk):
 
         # Mantener saldos de expensas al día antes de aplicar pagos
         try:
-            update_expensas(self.plan)
+            storage.update_expensas(self.plan)
             for code, _, imp in imputaciones:
                 if str(code).startswith('11-21-'):
-                    apply_payment_expensa(code.strip(), imp)
+                    storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
         iva_val = total_imputaciones - base_sin_iva
@@ -2249,7 +2247,7 @@ class App(tk.Tk):
             d = storage.load_expensas()
             if cuenta in d:
                 d.pop(cuenta)
-                save_expensas(d)
+                storage.save_expensas(d)
             nonlocal regs
             regs = [(c, *d[c]) for c in d]
             self._load_data()
@@ -2295,7 +2293,7 @@ class App(tk.Tk):
                 if cuenta != cuenta_n and cuenta in d:
                     d.pop(cuenta)
                 d[cuenta_n] = [mes_n, saldo_n]
-                save_expensas(d)
+                storage.save_expensas(d)
                 nonlocal regs
                 regs = [(c, *d[c]) for c in d]
                 self._load_data()
