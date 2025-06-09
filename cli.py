@@ -6,13 +6,13 @@ import datetime
 
 from model import cobro, pago, cliente
 import storage
-from storage import (
+from storage import(
     save_cobros, save_pagos, save_clients,
     load_plan_cuentas, load_tax_cobros, save_tax_cobros,
     load_tax_pagos, save_tax_pagos,
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
-    ensure_data_directory
+    ensure_data_directory)
 BRANCH_CODE = "0001"
 
 # Estilos globales
