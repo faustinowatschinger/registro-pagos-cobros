@@ -1024,6 +1024,7 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
+        iva_val = 0.0
         base_sin_iva = 0.0
         if total_imputaciones:
             try:
