@@ -1888,7 +1888,7 @@ class App(tk.Tk):
 
         # 12) Formulario “Agregar” (row=4)
         f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=2, column=0, sticky='ew', padx=10, pady=10)
+        f2.grid(row=3, column=0, sticky='ew', padx=10, pady=10)
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
         ttk.Label(f2, text='%IIBB:').grid(row=0, column=2, padx=10)
@@ -2114,7 +2114,7 @@ class App(tk.Tk):
 
         # 6) Formulario para agregar nuevo registro (row=4)
         f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=2, column=0, sticky='ew', pady=(10,0))
+        f2.grid(row=3, column=0, sticky='ew', pady=(10,0))
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1, padx=(5,20))
         ttk.Label(f2, text='%DByCR Banc.:').grid(row=0, column=2)
