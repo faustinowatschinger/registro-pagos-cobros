@@ -1024,7 +1024,12 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-        iva_val = total_imputaciones - base_sin_iva
+        base_sin_iva = 0.0
+        if total_imputaciones:
+            try:
+                base_sin_iva = total_imputaciones / (1 + pct_iva / 100)
+            except Exception:
+                base_sin_iva = total_imputaciones / 1.21
 
         # Construir el objeto cobro con los impuestos ya en pesos
         c = cobro(
