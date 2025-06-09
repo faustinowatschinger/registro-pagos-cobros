@@ -97,7 +97,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('Sistema de Cobros y Pagos')
-        self.state('zoomed')
+        try:
+            self.state('zoomed')
+        except tk.TclError:
+            # Some environments (like Xvfb) do not support this state
+            pass
         build_styles(self)
 
         # Cargo datos iniciales
@@ -970,7 +974,11 @@ class App(tk.Tk):
                            entry_fecha.get(),
                            e_nombre.get(), e_par.get(),
                            [
-                               (imps[i][0].get(), imps[i][1].get(), float(imps[i][2].get() or 0))
+                               (
+                                   imps[i][0].get(),
+                                   imps[i][1].get(),
+                                   float(str(imps[i][2].get()).replace(',', '.') or 0)
+                               )
                                for i in range(3)
                            ],
                            ca.get(), ma.get(),
@@ -988,7 +996,7 @@ class App(tk.Tk):
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
 
-        if round(total_imputaciones, 2) != round(montoA_val + montoB_val, 2):
+        if abs(total_imputaciones - (montoA_val + montoB_val)) > 0.01:
             messagebox.showerror(
                 'Error',
                 'La suma de "Monto A" y "Monto B" debe coincidir con el total de imputaciones.'
@@ -1016,7 +1024,12 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-        iva_val = total_imputaciones - base_sin_iva
+        base_sin_iva = 0.0
+        if total_imputaciones:
+            try:
+                base_sin_iva = total_imputaciones / (1 + pct_iva / 100)
+            except Exception:
+                base_sin_iva = total_imputaciones / 1.21
 
         # Construir el objeto cobro con los impuestos ya en pesos
         c = cobro(
@@ -1035,8 +1048,10 @@ class App(tk.Tk):
             iva_val,      # IVA en pesos (A+B)
             obs
         )
-        save_cobros((c,))
-        messagebox.showinfo('Éxito', 'Cobro guardado.')
+        if save_cobros((c,)):
+            messagebox.showinfo('Éxito', 'Cobro guardado.')
+        else:
+            messagebox.showerror('Error', 'No se pudo guardar el cobro.')
         self._load_data()
         self._show_frame('lst_cobros')
 
