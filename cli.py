@@ -698,6 +698,12 @@ class App(tk.Tk):
                 e_nombre.after_cancel(acc_hide_id)
             acc_hide_id = e_nombre.after(150, hide_acc_popup)
 
+        def cancel_hide_acc(event=None):
+            nonlocal acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+                acc_hide_id = None
+
         def show_acc_popup(code_entry, name_entry, date_entry, event=None):
             nonlocal acc_win, acc_tree, acc_hide_id
             if acc_hide_id:
@@ -736,6 +742,7 @@ class App(tk.Tk):
                 acc_tree.insert('', 'end', values=(c, n))
             acc_tree.pack(expand=True, fill='both')
             acc_tree.focus_set()
+            cancel_hide_acc()
 
             def choose_account(ev=None):
                 sel = acc_tree.selection()
@@ -756,6 +763,7 @@ class App(tk.Tk):
             acc_tree.bind('<Return>', choose_account)
             acc_tree.bind('<Escape>', lambda e: hide_acc_popup())
             acc_tree.bind('<FocusOut>', hide_acc_popup_later)
+            acc_tree.bind('<FocusIn>', cancel_hide_acc)
 
             x = name_entry.winfo_rootx()
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
@@ -872,6 +880,12 @@ class App(tk.Tk):
                 self.after_cancel(cash_hide_id)
             cash_hide_id = self.after(150, hide_cash_popup)
 
+        def cancel_hide_cash(event=None):
+            nonlocal cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+                cash_hide_id = None
+
         def show_cash_popup(code_entry, name_entry, event=None):
             nonlocal cash_win, cash_tree, cash_hide_id
             if cash_hide_id:
@@ -902,6 +916,7 @@ class App(tk.Tk):
                 cash_tree.insert('', 'end', values=(c, n, f"{p_i:.2f}", f"{p_d:.2f}"))
             cash_tree.pack(expand=True, fill='both')
             cash_tree.focus_set()
+            cancel_hide_cash()
 
             def choose_cash(ev=None):
                 sel = cash_tree.selection()
@@ -922,6 +937,7 @@ class App(tk.Tk):
             cash_tree.bind('<Return>', choose_cash)
             cash_tree.bind('<Escape>', lambda e: hide_cash_popup())
             cash_tree.bind('<FocusOut>', hide_cash_popup_later)
+            cash_tree.bind('<FocusIn>', cancel_hide_cash)
 
             x = name_entry.winfo_rootx()
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
