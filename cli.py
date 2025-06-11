@@ -426,7 +426,7 @@ class App(tk.Tk):
     
         # 1) Contenedor principal dentro de “parent”
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
     
         # 2) Título
         ttk.Label(cont, text='Registro Ingreso', style='Title.TLabel').pack(pady=(0,20))
@@ -1067,7 +1067,7 @@ class App(tk.Tk):
 
         # 2) Contenedor principal centrado
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
 
         # 3) Título
         ttk.Label(cont, text='Registro Egreso', style='Title.TLabel').pack(pady=(0,20))
@@ -1372,7 +1372,7 @@ class App(tk.Tk):
             w.destroy()
 
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
 
         ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel').pack(pady=(0,20))
 
