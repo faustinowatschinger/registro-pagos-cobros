@@ -113,7 +113,11 @@ def save_plan_cuentas(plan_tuple):
 TAX_COBROS_FILE = 'tax_cobros.txt'
 
 def load_tax_cobros():
-    """Return dict {cuenta: (iibb_decimal, dbcr_decimal)}"""
+    """Return dict {cuenta: (iibb_decimal, dbcr_decimal)}.
+
+    Older files may store percentages (e.g. ``5`` for 5%). These are
+    normalised to decimals when loading.
+    """
     path = os.path.join(ensure_data_directory(), TAX_COBROS_FILE)
     tbl = {}
     if os.path.exists(path):
@@ -121,27 +125,33 @@ def load_tax_cobros():
             if not l.strip():
                 continue
             num, pct_iibb, pct_dbcr = ast.literal_eval(l)
-            # values are stored as percentages, convert to decimals
-            tbl[str(num)] = (
-                float(pct_iibb) / 100.0,
-                float(pct_dbcr) / 100.0,
-            )
+            iibb = float(pct_iibb)
+            dbcr = float(pct_dbcr)
+            if abs(iibb) > 1:
+                iibb /= 100.0
+            if abs(dbcr) > 1:
+                dbcr /= 100.0
+            tbl[str(num)] = (iibb, dbcr)
     return tbl
 
 
 def save_tax_cobros(tax_tuple):
-    """Persist tax percentages as entered (e.g. ``5`` for 5%)."""
+    """Save tax rates converting from percentages to decimals."""
     path = os.path.join(ensure_data_directory(), TAX_COBROS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_iibb, pct_dbcr in tax_tuple:
-            f.write(repr((num, float(pct_iibb), float(pct_dbcr))) + "\n")
+            f.write(repr((num, float(pct_iibb) / 100.0, float(pct_dbcr) / 100.0)) + "\n")
     return True
 
 # Para Pagos (solo DByCR bancario)
 TAX_PAGOS_FILE = 'tax_pagos.txt'
 
 def load_tax_pagos():
-    """Return dict {cuenta: dbcr_decimal}"""
+    """Return dict {cuenta: dbcr_decimal}.
+
+    Older files might store the percentage as whole numbers; these are
+    converted to decimals when loading.
+    """
     path = os.path.join(ensure_data_directory(), TAX_PAGOS_FILE)
     tbl = {}
     if os.path.exists(path):
@@ -149,16 +159,19 @@ def load_tax_pagos():
             if not l.strip():
                 continue
             num, pct_dbcr = ast.literal_eval(l)
-            tbl[str(num)] = float(pct_dbcr) / 100.0
+            dbcr = float(pct_dbcr)
+            if abs(dbcr) > 1:
+                dbcr /= 100.0
+            tbl[str(num)] = dbcr
     return tbl
 
 
 def save_tax_pagos(tax_tuple):
-    """Persist tax percentage as entered."""
+    """Save payment tax rate converting from percentage to decimal."""
     path = os.path.join(ensure_data_directory(), TAX_PAGOS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_dbcr in tax_tuple:
-            f.write(repr((num, float(pct_dbcr))) + "\n")
+            f.write(repr((num, float(pct_dbcr) / 100.0)) + "\n")
     return True
 
 # --- Expensas -------------------------------------------------

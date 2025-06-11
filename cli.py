@@ -1917,7 +1917,7 @@ class App(tk.Tk):
 
             nonlocal regs
             regs = [
-                (str(r[0]), float(r[1]) / 100.0, float(r[2]) / 100.0)
+                (str(r[0]), float(r[1]) * 100.0, float(r[2]) * 100.0)
                 for r in originales
             ]
             aplicar_filtros_tax_cobros()
@@ -1960,7 +1960,11 @@ class App(tk.Tk):
                 try:
                     regs[idx_reg] = (e_c.get(), float(e_i.get()), float(e_d.get()))
                     persist = [
-                        (r[0], r[1] * 100.0, r[2] * 100.0)
+                        (
+                            r[0],
+                            float(r[1]) / 100.0,
+                            float(r[2]) / 100.0,
+                        )
                         for r in regs
                     ]
                     overwrite_records(full_path, persist)
@@ -1988,7 +1992,11 @@ class App(tk.Tk):
             text='Agregar',
             style='Big.TButton',
             command=lambda: (
-                save_tax_cobros(((e_c.get(), float(e_i.get()), float(e_d.get())),)),
+                save_tax_cobros(((
+                    e_c.get(),
+                    float(e_i.get()) / 100.0,
+                    float(e_d.get()) / 100.0,
+                ),)),
                 messagebox.showinfo('Éxito', 'Registro Cobros agregado.'),
                 self._show_frame('tax_cobros')
             )
@@ -2159,7 +2167,10 @@ class App(tk.Tk):
             overwrite_records(full_path, originales)
 
             nonlocal regs
-            regs = [(str(r[0]), float(r[1]) / 100.0) for r in originales]
+            regs = [
+                (str(r[0]), float(r[1]) * 100.0)
+                for r in originales
+            ]
             aplicar_filtros_tax_pagos()
 
         boton_elim.config(command=eliminar_tax_pagos)
@@ -2194,7 +2205,10 @@ class App(tk.Tk):
                 try:
                     regs[idx_reg] = (e_c.get(), float(e_d.get()))
                     persist = [
-                        (r[0], r[1] * 100.0)
+                        (
+                            r[0],
+                            float(r[1]) / 100.0,
+                        )
                         for r in regs
                     ]
                     overwrite_records(full_path, persist)
@@ -2220,7 +2234,7 @@ class App(tk.Tk):
             text='Agregar',
             style='Big.TButton',
             command=lambda: (
-                save_tax_pagos(((e_c.get(), float(e_d.get())),)),
+                save_tax_pagos(((e_c.get(), float(e_d.get()) / 100.0),)),
                 messagebox.showinfo('Éxito', 'Registro Pagos agregado.'),
                 self._show_frame('tax_pagos')
             )
