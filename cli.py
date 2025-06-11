@@ -2022,7 +2022,9 @@ class App(tk.Tk):
         lbl_title.pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-        regs = [(num, tbl[num]) for num in tbl]
+        regs = []
+        for num, rate in tbl.items():
+            regs.append((str(num), float(rate)))
         # regs = [(cuenta, pct_dbcr), ...]
 
         cont = ttk.Frame(parent, padding=5)
