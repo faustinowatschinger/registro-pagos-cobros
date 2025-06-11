@@ -1099,22 +1099,21 @@ class App(tk.Tk):
         except Exception as e:
             print('Error actualizando expensas:', e)
         cobro_rec = cobro(
-            fecha,
-            nombre_cli,
-            parcela,
-            # … campos de imputaciones …
-            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
-            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
-            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
-            cuentaA,
-            montoA_val,
-            cuentaB,
-            montoB_val,
-            monto_dbcr,
-            monto_iibb,
-            iva_val,
-            obs,
-        )
+            id=get_next_cobro_id(),
+            fecha=fecha,
+            nombreCompleto=nombre_cli,
+            numParcela=parcela,
+            imputacion1=imputaciones[0][0], concepto1=imputaciones[0][1], fecha1=imputaciones[0][2], importeBruto1=imputaciones[0][3],
+            imputacion2=imputaciones[1][0], concepto2=imputaciones[1][1], fecha2=imputaciones[1][2], importeBruto2=imputaciones[1][3],
+            imputacion3=imputaciones[2][0], concepto3=imputaciones[2][1], fecha3=imputaciones[2][2], importeBruto3=imputaciones[2][3],
+            numCuentaA=cuentaA,
+            montoA=montoA_val,
+            numCuentaB=cuentaB,
+            montoB=montoB_val,
+            impuestoDBCRb=monto_dbcr,
+            anticipoIIBB=monto_iibb,
+            iva=iva_val,
+            observaciones=obs,
         if save_cobros((cobro_rec,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
