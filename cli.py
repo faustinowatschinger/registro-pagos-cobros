@@ -1105,26 +1105,48 @@ class App(tk.Tk):
         except Exception as e:
             print('Error actualizando expensas:', e)
         cobro_rec = cobro(
-            fecha,
-            nombre_cli,
-            parcela,
-            # … campos de imputaciones …
-            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
-            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
-            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
-            cuentaA,
-            montoA_val,
-            cuentaB,
-            montoB_val,
-            monto_dbcr,
-            monto_iibb,
-            iva_val,
-            obs,
+            get_next_cobro_id(),   # id
+            fecha,                 # fecha
+            nombre_cli,            # nombreCompleto
+            parcela,               # numParcela
+        
+            # —— Imputación 1 ——
+            imputaciones[0][0],    # 1) código
+            imputaciones[0][1],    # 2) concepto
+            imputaciones[0][2],    # 3) ***fecha***
+            imputaciones[0][3],    # 4) importe
+        
+            # —— Imputación 2 ——
+            imputaciones[1][0],
+            imputaciones[1][1],
+            imputaciones[1][2],    # ***fecha2***
+            imputaciones[1][3],
+        
+            # —— Imputación 3 ——
+            imputaciones[2][0],
+            imputaciones[2][1],
+            imputaciones[2][2],    # ***fecha3***
+            imputaciones[2][3],
+        
+            # —— Cuentas y montos ——
+            cuentaA,  montoA_val,
+            cuentaB,  montoB_val,
+        
+            # —— Impuestos y obs ——
+            monto_dbcr,            # impuestoDBCRb
+            monto_iibb,            # anticipoIIBB
+            iva_val,               # iva
+            obs                    # observaciones
         )
-        if save_cobros((c,)):
+                      # ← ¡único paréntesis de cierre aquí!
+
+
+    # Guarda el registro: pasa una tupla con el objeto recién creado
+        if save_cobros((cobro_rec,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
             messagebox.showerror('Error', 'No se pudo guardar el cobro.')
+    
         self._load_data()
         self._show_frame('lst_cobros')
 
