@@ -704,9 +704,13 @@ class App(tk.Tk):
             if not cli_num:
                 return
             suf = '-' + str(cli_num).zfill(3)
+            prefixes = (
+                '11-21', '11-22', '11-24',
+                '11-25', '11-26', '21-20', '21-30'
+            )
             matches = [
                 (c, n) for c, n in self.plan.items()
-                if str(c).endswith(suf)
+                if str(c).endswith(suf) and any(str(c).startswith(p) for p in prefixes)
             ]
             if not matches:
                 return
