@@ -1765,10 +1765,11 @@ class App(tk.Tk):
 
         # 3) Leo registros de disco
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-        regs = [(num, *tbl[num]) for num in tbl]
-        # regs = [(cuenta, iibb_pct, dbcr_pct), ...]
-
-        # 4) Columnas definidas (se mostrarán: Cuenta, Nombre, %IIBB, %DByCR)
+        tax_data = load_tax_cobros()  # { 'cuenta': (iibb_decimal, dbcr_decimal) }
+        regs = [
+            (str(num), float(vals[0]), float(vals[1]))
+            for num, vals in tax_data.items()
+        ]
         cols = ['Cuenta', 'Nombre', '%IIBB', '%DByCR']
 
         cont.grid_columnconfigure(0, weight=1)
