@@ -1063,8 +1063,12 @@ class App(tk.Tk):
         montoB_val = float(montoB or 0)
 
         pct_iva = 0.21
-        iva_val = 0.0
-        base_sin_iva = 0.0
+        # Calcular IVA sobre el total de imputaciones
+        try:
+            base_sin_iva = total_imputaciones / (1 + pct_iva) if total_imputaciones else 0.0
+        except Exception:
+            base_sin_iva = total_imputaciones / 1.21 if total_imputaciones else 0.0
+        iva_val = total_imputaciones - base_sin_iva
 
         if abs(total_imputaciones - (montoA_val + montoB_val)) > 0.01:
             messagebox.showerror(
@@ -1094,13 +1098,6 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp, fec_imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-            try:
-                base_sin_iva = total_imputaciones / (1 + pct_iva)
-            except Exception:
-                base_sin_iva = total_imputaciones / 1.21
-
-        # Construir el objeto cobro con los impuestos ya en pesos
-        c = cobro(
             get_next_cobro_id(),
             fecha,
             nombre_cli,
