@@ -913,7 +913,11 @@ class App(tk.Tk):
                 cash_tree.heading(h, text=h)
                 cash_tree.column(h, width=w, anchor='center')
             for c, n, p_i, p_d in matches:
-                cash_tree.insert('', 'end', values=(c, n, f"{p_i:.2f}", f"{p_d:.2f}"))
+                cash_tree.insert(
+                    '',
+                    'end',
+                    values=(c, n, f"{p_i:.3f}", f"{p_d:.3f}"),
+                )
             cash_tree.pack(expand=True, fill='both')
             cash_tree.focus_set()
             cancel_hide_cash()
@@ -972,14 +976,14 @@ class App(tk.Tk):
                     montoB_val = 0.0
     
                 # 4) Calcular IIBB y DByCR sobre Monto A y Monto B
-                monto_iibb_A  = montoA_val * (pA_iibb / 100)
-                monto_dbcr_A  = montoA_val * (pA_dbcr / 100)
-                monto_iibb_B  = montoB_val * (pB_iibb / 100)
-                monto_dbcr_B  = montoB_val * (pB_dbcr / 100)
+                monto_iibb_A  = montoA_val * pA_iibb
+                monto_dbcr_A  = montoA_val * pA_dbcr
+                monto_iibb_B  = montoB_val * pB_iibb
+                monto_dbcr_B  = montoB_val * pB_dbcr
     
                 # 5) Calcular IVA (21%) **sobre el monto de cada cuenta**, no sobre el subtotal de imputaciones
-                pct_iva = 21.0
-                base_sin_iva = subtotal_imput / 1.21 if subtotal_imput else 0.0
+                pct_iva = 0.21
+                base_sin_iva = subtotal_imput / (1 + pct_iva) if subtotal_imput else 0.0
                 monto_iva = subtotal_imput - base_sin_iva
     
                 # 6) Mostrar los porcentajes combinados (suman de A+B)
@@ -988,12 +992,12 @@ class App(tk.Tk):
     
                 e_iibb.config(state='normal')
                 e_iibb.delete(0, 'end')
-                e_iibb.insert(0, f"{total_pct_iibb:.2f}")
+                e_iibb.insert(0, f"{total_pct_iibb:.3f}")
                 e_iibb.config(state='readonly')
     
                 e_dby.config(state='normal')
                 e_dby.delete(0, 'end')
-                e_dby.insert(0, f"{total_pct_dbcr:.2f}")
+                e_dby.insert(0, f"{total_pct_dbcr:.3f}")
                 e_dby.config(state='readonly')
     
                 e_iva.config(state='normal')
@@ -1070,10 +1074,10 @@ class App(tk.Tk):
         pB_iibb, pB_dbcr = tbl.get(cuentaB.strip(), (0.0, 0.0))
 
         # Montos de impuestos IIBB / DByCR por cuenta
-        monto_iibb_A  = montoA_val * (pA_iibb  / 100)
-        monto_dbcr_A  = montoA_val * (pA_dbcr  / 100)
-        monto_iibb_B  = montoB_val * (pB_iibb  / 100)
-        monto_dbcr_B  = montoB_val * (pB_dbcr  / 100)
+        monto_iibb_A  = montoA_val * pA_iibb
+        monto_dbcr_A  = montoA_val * pA_dbcr
+        monto_iibb_B  = montoB_val * pB_iibb
+        monto_dbcr_B  = montoB_val * pB_dbcr
 
         monto_iibb = monto_iibb_A + monto_iibb_B
         monto_dbcr = monto_dbcr_A + monto_dbcr_B
@@ -1086,11 +1090,11 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-        iva_val = 0.0
+        pct_iva = 0.21
         base_sin_iva = 0.0
         if total_imputaciones:
             try:
-                base_sin_iva = total_imputaciones / (1 + pct_iva / 100)
+                base_sin_iva = total_imputaciones / (1 + pct_iva)
             except Exception:
                 base_sin_iva = total_imputaciones / 1.21
 
@@ -1360,12 +1364,12 @@ class App(tk.Tk):
                 code = pago_cuenta.get().strip()
                 pct_dbcr = tblp.get(code, 0.0)
 
-                pct_iva = 21.0
-                monto_dbcr = total_val * (pct_dbcr / 100)
+                pct_iva = 0.21
+                monto_dbcr = total_val * pct_dbcr
 
                 e_dbcr_pct.config(state='normal')
                 e_dbcr_pct.delete(0, 'end')
-                e_dbcr_pct.insert(0, f"{pct_dbcr:.2f}")
+                e_dbcr_pct.insert(0, f"{pct_dbcr:.3f}")
                 e_dbcr_pct.config(state='readonly')
 
                 e_iva_pct.config(state='normal')
@@ -1407,7 +1411,7 @@ class App(tk.Tk):
 
         # 2) Calcular monto DByCR sobre (neto + IVA)
         total_val = monto_neto + monto_iva_val
-        monto_dbcr_val = total_val * (pct_dbcr / 100)
+        monto_dbcr_val = total_val * pct_dbcr
 
         # 3) Crear objeto pago con los valores en pesos
         p = pago(
@@ -1833,7 +1837,16 @@ class App(tk.Tk):
             for row in lista:
                 cuenta, iibb_pct, dbcr_pct = row
                 nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, iibb_pct, dbcr_pct))
+                tree.insert(
+                    '',
+                    'end',
+                    values=(
+                        cuenta,
+                        nombre,
+                        f"{iibb_pct:.3f}",
+                        f"{dbcr_pct:.3f}",
+                    ),
+                )
 
         poblar_tax_cobros(regs)
 
@@ -1897,7 +1910,10 @@ class App(tk.Tk):
             overwrite_records(full_path, originales)
 
             nonlocal regs
-            regs = [(str(r[0]), float(r[1]), float(r[2])) for r in originales]
+            regs = [
+                (str(r[0]), float(r[1]) / 100.0, float(r[2]) / 100.0)
+                for r in originales
+            ]
             aplicar_filtros_tax_cobros()
 
         boton_elim.config(command=eliminar_tax_cobros)
@@ -1937,7 +1953,11 @@ class App(tk.Tk):
             def guardar():
                 try:
                     regs[idx_reg] = (e_c.get(), float(e_i.get()), float(e_d.get()))
-                    overwrite_records(full_path, regs)
+                    persist = [
+                        (r[0], r[1] * 100.0, r[2] * 100.0)
+                        for r in regs
+                    ]
+                    overwrite_records(full_path, persist)
                     aplicar_filtros_tax_cobros()
                     win.destroy()
                 except ValueError:
@@ -2065,7 +2085,11 @@ class App(tk.Tk):
             for row in lista:
                 cuenta, pct_dbcr = row
                 nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, pct_dbcr))
+                tree.insert(
+                    '',
+                    'end',
+                    values=(cuenta, nombre, f"{pct_dbcr:.3f}"),
+                )
 
         poblar_tax_pagos(regs)
 
@@ -2129,7 +2153,7 @@ class App(tk.Tk):
             overwrite_records(full_path, originales)
 
             nonlocal regs
-            regs = [(str(r[0]), float(r[1])) for r in originales]
+            regs = [(str(r[0]), float(r[1]) / 100.0) for r in originales]
             aplicar_filtros_tax_pagos()
 
         boton_elim.config(command=eliminar_tax_pagos)
@@ -2163,7 +2187,11 @@ class App(tk.Tk):
             def guardar():
                 try:
                     regs[idx_reg] = (e_c.get(), float(e_d.get()))
-                    overwrite_records(full_path, regs)
+                    persist = [
+                        (r[0], r[1] * 100.0)
+                        for r in regs
+                    ]
+                    overwrite_records(full_path, persist)
                     aplicar_filtros_tax_pagos()
                     win.destroy()
                 except ValueError:

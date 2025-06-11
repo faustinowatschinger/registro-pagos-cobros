@@ -111,40 +111,63 @@ def save_plan_cuentas(plan_tuple):
     return True
 
 TAX_COBROS_FILE = 'tax_cobros.txt'
+
 def load_tax_cobros():
+    """Return dict {cuenta: (iibb_decimal, dbcr_decimal)}"""
     path = os.path.join(ensure_data_directory(), TAX_COBROS_FILE)
     tbl = {}
     if os.path.exists(path):
         for l in open(path, 'r', encoding='utf-8'):
-            if not l.strip(): continue
+            if not l.strip():
+                continue
             num, pct_iibb, pct_dbcr = ast.literal_eval(l)
-            tbl[str(num)] = (float(pct_iibb), float(pct_dbcr))
+            # values are stored as percentages, convert to decimals
+            tbl[str(num)] = (
+                float(pct_iibb) / 100.0,
+                float(pct_dbcr) / 100.0,
+            )
     return tbl
 
+
 def save_tax_cobros(tax_tuple):
+    """Save decimals as percentages for persistence"""
     path = os.path.join(ensure_data_directory(), TAX_COBROS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_iibb, pct_dbcr in tax_tuple:
-            f.write(repr((num, pct_iibb, pct_dbcr)) + "\n")
+            f.write(
+                repr(
+                    (
+                        num,
+                        float(pct_iibb) * 100.0,
+                        float(pct_dbcr) * 100.0,
+                    )
+                )
+                + "\n"
+            )
     return True
 
 # Para Pagos (solo DByCR bancario)
 TAX_PAGOS_FILE = 'tax_pagos.txt'
+
 def load_tax_pagos():
+    """Return dict {cuenta: dbcr_decimal}"""
     path = os.path.join(ensure_data_directory(), TAX_PAGOS_FILE)
     tbl = {}
     if os.path.exists(path):
         for l in open(path, 'r', encoding='utf-8'):
-            if not l.strip(): continue
+            if not l.strip():
+                continue
             num, pct_dbcr = ast.literal_eval(l)
-            tbl[str(num)] = float(pct_dbcr)
+            tbl[str(num)] = float(pct_dbcr) / 100.0
     return tbl
 
+
 def save_tax_pagos(tax_tuple):
+    """Persist decimals as percentages"""
     path = os.path.join(ensure_data_directory(), TAX_PAGOS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_dbcr in tax_tuple:
-            f.write(repr((num, pct_dbcr)) + "\n")
+            f.write(repr((num, float(pct_dbcr) * 100.0)) + "\n")
     return True
 
 # --- Expensas -------------------------------------------------
