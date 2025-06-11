@@ -32,7 +32,7 @@ def get_next_clients_id():
 
 def save_cobros(cobros_tuple):
     """
-    Graba la tupla de 20 campos en cobros.txt
+    Graba la tupla de 23 campos en cobros.txt
     """
     try:
         path = os.path.join(ensure_data_directory(), 'cobros.txt')
@@ -40,9 +40,9 @@ def save_cobros(cobros_tuple):
             for c in cobros_tuple:
                 record = (
                     c.id, c.fecha, c.nombreCompleto, c.numParcela,
-                    c.imputacion1, c.concepto1, c.importeBruto1,
-                    c.imputacion2, c.concepto2, c.importeBruto2,
-                    c.imputacion3, c.concepto3, c.importeBruto3,
+                    c.imputacion1, c.concepto1, c.fecha1, c.importeBruto1,
+                    c.imputacion2, c.concepto2, c.fecha2, c.importeBruto2,
+                    c.imputacion3, c.concepto3, c.fecha3, c.importeBruto3,
                     c.numCuentaA, c.montoA, c.numCuentaB, c.montoB,
                     c.impuestoDBCRb, c.anticipoIIBB, c.iva, c.observaciones
                 )

@@ -231,9 +231,9 @@ class App(tk.Tk):
         headers_map = {
             'cobros.txt': [
                 'ID','Fecha','Nombre y Apellido','Parcela',
-                'Imp1 Cod','Imp1 Desc','Imp1 Importe',
-                'Imp2 Cod','Imp2 Desc','Imp2 Importe',
-                'Imp3 Cod','Imp3 Desc','Imp3 Importe',
+                'Imp1 Cod','Imp1 Desc','Imp1 Fec','Imp1 Importe',
+                'Imp2 Cod','Imp2 Desc','Imp2 Fec','Imp2 Importe',
+                'Imp3 Cod','Imp3 Desc','Imp3 Fec','Imp3 Importe',
                 'Cuenta A','Monto A','Cuenta B','Monto B',
                 'DByCR %','IIBB %','IVA %','Observaciones'
             ],
@@ -634,17 +634,17 @@ class App(tk.Tk):
         # — 4) Detalle de Imputaciones —
         det = ttk.Frame(cont, padding=5)
         det.pack(fill='x', pady=(0,10))
-        cols = ['N° de Cuenta','Concepto que abona','Importe']
+        cols = ['N° de Cuenta','Concepto que abona','Fecha','Importe']
         for j, c in enumerate(cols):
             ttk.Label(det, text=c, style='Field.TLabel', borderwidth=1, relief='solid')\
                .grid(row=0, column=j, sticky='nsew', padx=1)
             det.columnconfigure(j, weight=1)
-    
-        # Creamos 3 filas (cada fila = [Entry de código, Entry de concepto (readonly), Entry de importe])
+
+        # Creamos 3 filas (código, concepto, fecha, importe)
         imps = []
         for i in range(1, 4):
             fila = []
-            for j in range(3):
+            for j in range(4):
                 ent = ttk.Entry(det, style='Field.TEntry')
                 ent.grid(row=i, column=j, sticky='nsew', padx=1, pady=2)
                 # Si es la columna “Concepto” (j == 1), lo dejamos en readonly
@@ -677,9 +677,10 @@ class App(tk.Tk):
             cli_name = e_nombre.get().strip().lower()
             if not cli_name:
                 return
+            allowed_prefixes = ('11-24', '11-25', '11-26', '21-20', '21-30')
             matches = [
                 (c, n) for c, n in self.plan.items()
-                if cli_name in n.lower()
+                if cli_name in n.lower() and any(c.startswith(p) for p in allowed_prefixes)
             ]
             if not matches:
                 return
@@ -734,14 +735,15 @@ class App(tk.Tk):
             concepto_entry.config(state='readonly')
     
         # Enlazar cada Entry de código con fill_con
-        for ent_codigo, ent_concepto, ent_importe in imps:
+        for fila in imps:
+            ent_codigo, ent_concepto = fila[0], fila[1]
             ent_concepto.bind('<Button-1>', lambda e, c=ent_codigo, o=ent_concepto: show_acc_popup(c, o))
             ent_concepto.bind('<FocusOut>', hide_acc_popup_later)
     
         # — 5) Total — (debajo de las imputaciones)
-        ttk.Label(det, text='TOTAL:', style='Field.TLabel').grid(row=4, column=1, sticky='e')
+        ttk.Label(det, text='TOTAL:', style='Field.TLabel').grid(row=4, column=2, sticky='e')
         l_tot = ttk.Label(det, text='0.00', style='Field.TLabel')
-        l_tot.grid(row=4, column=2, sticky='e', padx=1)
+        l_tot.grid(row=4, column=3, sticky='e', padx=1)
 
         # — 5.1) CARGA IMPOSITIVA —
         taxf = ttk.LabelFrame(cont, text='CARGA IMPOSITIVA', padding=5)
@@ -892,7 +894,7 @@ class App(tk.Tk):
         def upd_tot(e=None):
             try:
                 # 1) (Opcional) Subtotal de imputaciones
-                subtotal_imput = sum(float(r[2].get() or 0) for r in imps)
+                subtotal_imput = sum(float(r[3].get() or 0) for r in imps)
                 l_tot.config(text=f"{subtotal_imput:.2f}")
     
                 # 2) Obtener porcentajes IIBB / DByCR para Cuenta A y Cuenta B
@@ -959,8 +961,8 @@ class App(tk.Tk):
                 pass
     
         # Vincular eventos a upd_tot (DEBE SER DESPUÉS de definirla)
-        for _, _, ent_importe in imps:
-            ent_importe.bind('<KeyRelease>', upd_tot)
+        for fila in imps:
+            fila[-1].bind('<KeyRelease>', upd_tot)
         ca.bind('<KeyRelease>', upd_tot)
         ma.bind('<KeyRelease>', upd_tot)
         cb.bind('<KeyRelease>', upd_tot)
@@ -977,7 +979,8 @@ class App(tk.Tk):
                                (
                                    imps[i][0].get(),
                                    imps[i][1].get(),
-                                   float(str(imps[i][2].get()).replace(',', '.') or 0)
+                                   imps[i][2].get(),
+                                   float(str(imps[i][3].get()).replace(',', '.') or 0)
                                )
                                for i in range(3)
                            ],
@@ -992,7 +995,7 @@ class App(tk.Tk):
 
     def _save_cobro(self, fecha, nombre_cli, parcela, imputaciones,
                     cuentaA, montoA, cuentaB, montoB, obs):
-        total_imputaciones = sum(imp[2] for imp in imputaciones)
+        total_imputaciones = sum(imp[3] for imp in imputaciones)
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
 
@@ -1019,7 +1022,7 @@ class App(tk.Tk):
         # Mantener saldos de expensas al día antes de aplicar pagos
         try:
             storage.update_expensas(self.plan)
-            for code, _, imp in imputaciones:
+            for code, _, _, imp in imputaciones:
                 if str(code).startswith('11-21-'):
                     storage.apply_payment_expensa(code.strip(), imp)
         except Exception as e:
@@ -1039,9 +1042,9 @@ class App(tk.Tk):
             nombre_cli,
             parcela,
             # … campos de imputaciones …
-            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2],
-            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2],
-            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2],
+            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
+            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
+            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
             cuentaA, montoA_val,
             cuentaB, montoB_val,
             monto_dbcr,   # DByCR en pesos (A+B)
