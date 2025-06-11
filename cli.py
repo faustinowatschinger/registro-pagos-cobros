@@ -1062,6 +1062,10 @@ class App(tk.Tk):
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
 
+        pct_iva = 0.21
+        iva_val = 0.0
+        base_sin_iva = 0.0
+
         if abs(total_imputaciones - (montoA_val + montoB_val)) > 0.01:
             messagebox.showerror(
                 'Error',
@@ -1090,9 +1094,6 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp, fec_imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-        pct_iva = 0.21
-        base_sin_iva = 0.0
-        if total_imputaciones:
             try:
                 base_sin_iva = total_imputaciones / (1 + pct_iva)
             except Exception:
