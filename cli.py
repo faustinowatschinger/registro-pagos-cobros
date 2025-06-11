@@ -2023,8 +2023,9 @@ class App(tk.Tk):
         lbl_title.pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-        regs = []
-        for num, rate in tbl.items():
+        # Load table as {cuenta: porcentaje_dbcr_decimal}
+        data = load_tax_pagos()
+        for num, rate in data.items():
             regs.append((str(num), float(rate)))
         # regs = [(cuenta, pct_dbcr), ...]
 
