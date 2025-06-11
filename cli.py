@@ -699,7 +699,11 @@ class App(tk.Tk):
             acc_hide_id = e_nombre.after(150, hide_acc_popup)
 
         def show_acc_popup(code_entry, name_entry, date_entry, event=None):
-            nonlocal acc_win, acc_tree
+            nonlocal acc_win, acc_tree, acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+                acc_hide_id = None
+            
             cli_num = e_cli.get().strip()
             if not cli_num:
                 return
@@ -869,7 +873,10 @@ class App(tk.Tk):
             cash_hide_id = self.after(150, hide_cash_popup)
 
         def show_cash_popup(code_entry, name_entry, event=None):
-            nonlocal cash_win, cash_tree
+            nonlocal cash_win, cash_tree, cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+                cash_hide_id = None
             taxes = load_tax_cobros()
             matches = [
                 (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
