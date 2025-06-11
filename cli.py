@@ -1058,6 +1058,12 @@ class App(tk.Tk):
 
     def _save_cobro(self, fecha, nombre_cli, parcela, imputaciones,
                     cuentaA, montoA, cuentaB, montoB, obs):
+        """Persist a new cobro record.
+
+        Parameters mirror the cobro constructor and each record is built using
+        named arguments so every required field (including ``observaciones``)
+        is supplied.
+        """
         total_imputaciones = sum(imp[3] for imp in imputaciones)
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
