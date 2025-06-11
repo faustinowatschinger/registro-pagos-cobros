@@ -10,7 +10,7 @@
 (10, 'Flores Jorge', '', '', '2996327597', '', 'chaira_flo@yahoo.com.ar', '01-04', '', '', '780', '')
 (11, 'Coria Hector', '', '', '2932531299', '', '', '01-05', '01-07', '', '2.466', '')
 (12, 'Sandoval Daniel Alberto', '', '', '2996321554', '', '', '01-06', '', '', '2.130', '')
-(13, 'Chalop Pablo  y Sepï¿½lveda', '', '', '2994547465', '', 'pablo84skay-@hotmail.com', '02-01', '', '', '907', '')
+(13, 'Chalop Pablo  y Sepulveda', '', '', '2994547465', '', 'pablo84skay-@hotmail.com', '02-01', '', '', '907', '')
 (14, 'Garcia Antonio Javier  y  Funakoshii Angelina', '', '', '2994089687', '', '', '02-02', '', '', '826', '')
 (15, 'Magario Juan y Semper Valentina', '', '', '2995556185', '2216221383', '', '02-03', '', '', '827', '2216221383 ï¿½?')
 (16, 'Magario Carlos', '', '', '2995294651', '', 'csmagario@gmail.com', '02-04', '', '', '827', '')
