@@ -520,8 +520,6 @@ class App(tk.Tk):
         entry_fecha.bind("<KeyRelease>", on_keyrelease_fecha)
 
         def prepare_date_entry(ent):
-            hoy = datetime.date.today()
-            ent.insert(0, formatear_ddmmyyyy(hoy.strftime('%d%m%Y')))
             def _on_keyrel(ev):
                 antiguo = ent.get()
                 pos_orig = ent.index('insert')
@@ -700,15 +698,15 @@ class App(tk.Tk):
                 e_nombre.after_cancel(acc_hide_id)
             acc_hide_id = e_nombre.after(150, hide_acc_popup)
 
-        def show_acc_popup(code_entry, name_entry, event=None):
+        def show_acc_popup(code_entry, name_entry, date_entry, event=None):
             nonlocal acc_win, acc_tree
-            cli_name = e_nombre.get().strip().lower()
-            if not cli_name:
+            cli_num = e_cli.get().strip()
+            if not cli_num:
                 return
-            allowed_prefixes = ('11-24', '11-25', '11-26', '21-20', '21-30')
+            suf = '-' + str(cli_num).zfill(3)
             matches = [
                 (c, n) for c, n in self.plan.items()
-                if cli_name in n.lower() and any(c.startswith(p) for p in allowed_prefixes)
+                if str(c).endswith(suf)
             ]
             if not matches:
                 return
@@ -741,6 +739,8 @@ class App(tk.Tk):
                     name_entry.delete(0, 'end')
                     name_entry.insert(0, nombre)
                     name_entry.config(state='readonly')
+                    if not date_entry.get().strip():
+                        date_entry.insert(0, entry_fecha.get())
                     code_entry.focus_set()
                 hide_acc_popup()
 
@@ -753,19 +753,23 @@ class App(tk.Tk):
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
             acc_win.geometry(f'+{x}+{y}')   
     
-        def fill_con(event, codigo_entry, concepto_entry):
+        def fill_con(event, codigo_entry, concepto_entry, fecha_entry=None):
             clave = codigo_entry.get().strip()
             nombre = self.plan.get(clave, '')
-            # Abrimos temporalmente el Entry de “Concepto” para insertar el texto
             concepto_entry.config(state='normal')
             concepto_entry.delete(0, 'end')
             concepto_entry.insert(0, nombre)
             concepto_entry.config(state='readonly')
+            if fecha_entry and not fecha_entry.get().strip():
+                fecha_entry.insert(0, entry_fecha.get())
     
         # Enlazar cada Entry de código con fill_con
         for fila in imps:
-            ent_codigo, ent_concepto = fila[0], fila[1]
-            ent_concepto.bind('<Button-1>', lambda e, c=ent_codigo, o=ent_concepto: show_acc_popup(c, o))
+            ent_codigo, ent_concepto, ent_fecha = fila[0], fila[1], fila[2]
+            ent_concepto.bind(
+                '<Button-1>',
+                lambda e, c=ent_codigo, o=ent_concepto, f=ent_fecha: show_acc_popup(c, o, f)
+            )
             ent_concepto.bind('<FocusOut>', hide_acc_popup_later)
     
         # — 5) Total — (debajo de las imputaciones)
