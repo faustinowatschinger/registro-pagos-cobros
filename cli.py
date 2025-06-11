@@ -1765,10 +1765,9 @@ class App(tk.Tk):
 
         # 3) Leo registros de disco
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-            (num, tbl[num][0], tbl[num][1])
-        regs = [(num, *tbl[num]) for num in tbl]
-        # regs = [(cuenta, iibb_pct, dbcr_pct), ...]
-
+        regs = []
+        for num, vals in tbl.items():
+            regs.append((str(num), float(vals[0]), float(vals[1])))
         # 4) Columnas definidas (se mostrarán: Cuenta, Nombre, %IIBB, %DByCR)
         cols = ['Cuenta', 'Nombre', '%IIBB', '%DByCR']
 
@@ -2023,7 +2022,9 @@ class App(tk.Tk):
         lbl_title.pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-        regs = [(num, tbl[num]) for num in tbl]
+        regs = []
+        for num, rate in tbl.items():
+            regs.append((str(num), float(rate)))
         # regs = [(cuenta, pct_dbcr), ...]
 
         cont = ttk.Frame(parent, padding=5)
