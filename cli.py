@@ -1114,7 +1114,7 @@ class App(tk.Tk):
             monto_iibb,
             iva_val,
             obs,
-        )
+        
         if save_cobros((c,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
