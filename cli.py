@@ -1687,8 +1687,7 @@ class App(tk.Tk):
             nuevos = [r for r in actuales if str(r[0]) != str(num_cuenta)]
             overwrite_records(full_path, nuevos)
 
-            nonlocal regs
-            regs = nuevos
+            regs[:] = nuevos
             aplicar_filtros_plan()
 
         btn_elim.config(command=eliminar_plan)
@@ -1923,8 +1922,7 @@ class App(tk.Tk):
                     originales.append(tup)
             overwrite_records(full_path, originales)
 
-            nonlocal regs
-            regs = [
+            regs[:] = [
                 (str(r[0]), float(r[1]), float(r[2]))
                 for r in originales
             ]
@@ -2180,8 +2178,7 @@ class App(tk.Tk):
                     originales.append(tup)
             overwrite_records(full_path, originales)
 
-            nonlocal regs
-            regs = [
+            regs[:] = [
                 (str(r[0]), float(r[1]))
                 for r in originales
             ]
@@ -2398,8 +2395,7 @@ class App(tk.Tk):
             if idx is not None:
                 d.pop(idx)
                 storage.save_expensas(d)
-            nonlocal regs
-            regs = d
+            regs[:] = d
             self._load_data()
             poblar_exp(regs)
 
@@ -2450,8 +2446,7 @@ class App(tk.Tk):
                 if idx is not None:
                     d[idx] = (cuenta_n, fecha_n, monto_n)
                     storage.save_expensas(d)
-                nonlocal regs
-                regs = d
+                regs[:] = d
                 self._load_data()
                 poblar_exp(regs)
                 win.destroy()
