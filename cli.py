@@ -1555,7 +1555,7 @@ class App(tk.Tk):
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=150, anchor='center')
+            tree.column(c, width=150, anchor='center', stretch=True)
 
         # Función para llenar el Treeview
         def poblar_plan(lista):
@@ -1994,7 +1994,7 @@ class App(tk.Tk):
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=140, anchor='center')
+            tree.column(c, width=140, anchor='center', stretch=True)
 
         # 3) Poblamos inicialmente
         def poblar_tax_pagos(lista):
