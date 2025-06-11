@@ -3,9 +3,9 @@
 class cobro:
     def __init__(self,
                  id, fecha, nombreCompleto, numParcela,
-                 imputacion1, concepto1, importeBruto1,
-                 imputacion2, concepto2, importeBruto2,
-                 imputacion3, concepto3, importeBruto3,
+                 imputacion1, concepto1, fecha1, importeBruto1,
+                 imputacion2, concepto2, fecha2, importeBruto2,
+                 imputacion3, concepto3, fecha3, importeBruto3,
                  numCuentaA, montoA, numCuentaB, montoB,
                  impuestoDBCRb, anticipoIIBB, iva, observaciones):
         # claves de la tupla: 0..19
@@ -15,12 +15,15 @@ class cobro:
         self.numParcela = numParcela
         self.imputacion1 = imputacion1
         self.concepto1 = concepto1
+        self.fecha1 = fecha1
         self.importeBruto1 = importeBruto1
         self.imputacion2 = imputacion2
         self.concepto2 = concepto2
+        self.fecha2 = fecha2
         self.importeBruto2 = importeBruto2
         self.imputacion3 = imputacion3
         self.concepto3 = concepto3
+        self.fecha3 = fecha3
         self.importeBruto3 = importeBruto3
         self.numCuentaA = numCuentaA
         self.montoA = montoA
@@ -35,9 +38,9 @@ class cobro:
         return (
             f"Cobro(id={self.id}, fecha={self.fecha}, pagador={self.nombreCompleto}, "
             f"parcela={self.numParcela}, "
-            f"[{self.imputacion1},{self.concepto1},{self.importeBruto1}], "
-            f"[{self.imputacion2},{self.concepto2},{self.importeBruto2}], "
-            f"[{self.imputacion3},{self.concepto3},{self.importeBruto3}], "
+            f"[{self.imputacion1},{self.concepto1},{self.fecha1},{self.importeBruto1}], "
+            f"[{self.imputacion2},{self.concepto2},{self.fecha2},{self.importeBruto2}], "
+            f"[{self.imputacion3},{self.concepto3},{self.fecha3},{self.importeBruto3}], "
             f"CuentaA={self.numCuentaA}, MontoA={self.montoA}, "
             f"CuentaB={self.numCuentaB}, MontoB={self.montoB}, "
             f"DByCRbBnc={self.impuestoDBCRb}, IIBB={self.anticipoIIBB}, IVA={self.iva}, "
