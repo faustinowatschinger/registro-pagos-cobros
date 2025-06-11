@@ -1098,7 +1098,7 @@ class App(tk.Tk):
                     storage.apply_payment_expensa(code.strip(), imp, fec_imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
-            get_next_cobro_id(),
+        cobro_rec = cobro(
             fecha,
             nombre_cli,
             parcela,
@@ -1115,7 +1115,7 @@ class App(tk.Tk):
             iva_val,
             obs,
         )
-        if save_cobros((c,)):
+        if save_cobros((cobro_rec,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
             messagebox.showerror('Error', 'No se pudo guardar el cobro.')
