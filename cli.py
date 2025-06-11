@@ -1765,7 +1765,6 @@ class App(tk.Tk):
 
         # 3) Leo registros de disco
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-            (num, tbl[num][0], tbl[num][1])
         regs = [(num, *tbl[num]) for num in tbl]
         # regs = [(cuenta, iibb_pct, dbcr_pct), ...]
 
