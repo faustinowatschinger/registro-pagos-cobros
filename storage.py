@@ -227,7 +227,28 @@ def update_expensas(plan_dict):
         save_expensas(exps)
 
 def apply_payment_expensa(cuenta, amount, fecha):
-    """Append a negative payment record for the given account."""
+    """Append a negative payment record for the given account.
+
+    The date is stored as ``YYYY-MM`` to match monthly expensa entries.
+    """
+
+    def _month_from(f):
+        if isinstance(f, (datetime.date, datetime.datetime)):
+            return f.strftime('%Y-%m')
+        s = str(f)
+        try:
+            dt = datetime.datetime.strptime(s, '%d/%m/%Y')
+            return dt.strftime('%Y-%m')
+        except Exception:
+            pass
+        try:
+            dt = datetime.datetime.strptime(s[:10], '%Y-%m-%d')
+            return dt.strftime('%Y-%m')
+        except Exception:
+            pass
+        return s[:7]
+
     exps = load_expensas()
-    exps.append((str(cuenta), str(fecha), -abs(float(amount))))
+    mes = _month_from(fecha)
+    exps.append((str(cuenta), mes, -abs(float(amount))))
     save_expensas(exps)
