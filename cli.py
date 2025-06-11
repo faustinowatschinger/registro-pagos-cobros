@@ -893,12 +893,7 @@ class App(tk.Tk):
                 cash_hide_id = None
             taxes = load_tax_cobros()
             matches = [
-                (
-                    c,
-                    self.plan.get(c, ''),
-                    taxes[c][0] * 100.0,
-                    taxes[c][1] * 100.0,
-                )
+                (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
                 for c in taxes
             ]
             if not matches:
@@ -992,8 +987,8 @@ class App(tk.Tk):
                 monto_iva = subtotal_imput - base_sin_iva
     
                 # 6) Mostrar los porcentajes combinados (suman de A+B)
-                total_pct_iibb = (pA_iibb + pB_iibb) * 100
-                total_pct_dbcr = (pA_dbcr + pB_dbcr) * 100
+                total_pct_iibb = pA_iibb + pB_iibb
+                total_pct_dbcr = pA_dbcr + pB_dbcr
     
                 e_iibb.config(state='normal')
                 e_iibb.delete(0, 'end')
@@ -1110,48 +1105,26 @@ class App(tk.Tk):
         except Exception as e:
             print('Error actualizando expensas:', e)
         cobro_rec = cobro(
-            get_next_cobro_id(),   # id
-            fecha,                 # fecha
-            nombre_cli,            # nombreCompleto
-            parcela,               # numParcela
-        
-            # —— Imputación 1 ——
-            imputaciones[0][0],    # 1) código
-            imputaciones[0][1],    # 2) concepto
-            imputaciones[0][2],    # 3) ***fecha***
-            imputaciones[0][3],    # 4) importe
-        
-            # —— Imputación 2 ——
-            imputaciones[1][0],
-            imputaciones[1][1],
-            imputaciones[1][2],    # ***fecha2***
-            imputaciones[1][3],
-        
-            # —— Imputación 3 ——
-            imputaciones[2][0],
-            imputaciones[2][1],
-            imputaciones[2][2],    # ***fecha3***
-            imputaciones[2][3],
-        
-            # —— Cuentas y montos ——
-            cuentaA,  montoA_val,
-            cuentaB,  montoB_val,
-        
-            # —— Impuestos y obs ——
-            monto_dbcr,            # impuestoDBCRb
-            monto_iibb,            # anticipoIIBB
-            iva_val,               # iva
-            obs                    # observaciones
+            fecha,
+            nombre_cli,
+            parcela,
+            # … campos de imputaciones …
+            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
+            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
+            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
+            cuentaA,
+            montoA_val,
+            cuentaB,
+            montoB_val,
+            monto_dbcr,
+            monto_iibb,
+            iva_val,
+            obs,
         )
-                      # ← ¡único paréntesis de cierre aquí!
-
-
-    # Guarda el registro: pasa una tupla con el objeto recién creado
-        if save_cobros((cobro_rec,)):
+        if save_cobros((c,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
             messagebox.showerror('Error', 'No se pudo guardar el cobro.')
-    
         self._load_data()
         self._show_frame('lst_cobros')
 
@@ -1362,7 +1335,7 @@ class App(tk.Tk):
             code = imput_cuenta.get().strip()
             name = self.plan.get(code, '')
             imput_denom.config(state='normal')
-                e_dbcr_pct.insert(0, f"{pct_dbcr * 100:.3f}")
+            imput_denom.delete(0, 'end')
             imput_denom.insert(0, name)
             imput_denom.config(state='readonly')
 
@@ -1744,12 +1717,8 @@ class App(tk.Tk):
                 regs[idx_reg] = (e_num.get(), e_nom.get())
                 overwrite_records(full_path, regs)
                 self._load_data()
-        tbl = load_tax_cobros()  # dict { 'cuenta': (iibb_decimal, dbcr_decimal) }
-        # convert to percentages for display
-        regs = [
-            (num, tbl[num][0] * 100.0, tbl[num][1] * 100.0)
-            for num in tbl
-        ]
+                aplicar_filtros_plan()
+                win.destroy()
 
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
 
@@ -1909,12 +1878,11 @@ class App(tk.Tk):
                     if txt1.lower() not in nombre.lower():
                         match = False
 
-                (str(r[0]), float(r[1]), float(r[2]))
-                        (r[0], r[1], r[2])
+                if match:
+                    filtrados.append(row)
 
-        tbl = load_tax_pagos()  # dict { 'cuenta': pct_dbcr_decimal }
-        # convert to percentages for display
-        regs = [(num, tbl[num] * 100.0) for num in tbl]
+            poblar_tax_cobros(filtrados)
+
         ent_cuenta.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
         ent_nombre.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
 
@@ -2151,9 +2119,9 @@ class App(tk.Tk):
                 if match and txt1:
                     nombre = self.plan.get(cuenta, '')
                     if txt1.lower() not in nombre.lower():
-            regs = [(str(r[0]), float(r[1])) for r in originales]
+                        match = False
 
-                        (r[0], r[1])
+                if match:
                     filtrados.append(row)
 
             poblar_tax_pagos(filtrados)
