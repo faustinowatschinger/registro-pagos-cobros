@@ -893,7 +893,12 @@ class App(tk.Tk):
                 cash_hide_id = None
             taxes = load_tax_cobros()
             matches = [
-                (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
+                (
+                    c,
+                    self.plan.get(c, ''),
+                    taxes[c][0] * 100.0,
+                    taxes[c][1] * 100.0,
+                )
                 for c in taxes
             ]
             if not matches:
@@ -987,8 +992,8 @@ class App(tk.Tk):
                 monto_iva = subtotal_imput - base_sin_iva
     
                 # 6) Mostrar los porcentajes combinados (suman de A+B)
-                total_pct_iibb = pA_iibb + pB_iibb
-                total_pct_dbcr = pA_dbcr + pB_dbcr
+                total_pct_iibb = (pA_iibb + pB_iibb) * 100
+                total_pct_dbcr = (pA_dbcr + pB_dbcr) * 100
     
                 e_iibb.config(state='normal')
                 e_iibb.delete(0, 'end')
@@ -1357,7 +1362,7 @@ class App(tk.Tk):
             code = imput_cuenta.get().strip()
             name = self.plan.get(code, '')
             imput_denom.config(state='normal')
-            imput_denom.delete(0, 'end')
+                e_dbcr_pct.insert(0, f"{pct_dbcr * 100:.3f}")
             imput_denom.insert(0, name)
             imput_denom.config(state='readonly')
 
@@ -1739,8 +1744,12 @@ class App(tk.Tk):
                 regs[idx_reg] = (e_num.get(), e_nom.get())
                 overwrite_records(full_path, regs)
                 self._load_data()
-                aplicar_filtros_plan()
-                win.destroy()
+        tbl = load_tax_cobros()  # dict { 'cuenta': (iibb_decimal, dbcr_decimal) }
+        # convert to percentages for display
+        regs = [
+            (num, tbl[num][0] * 100.0, tbl[num][1] * 100.0)
+            for num in tbl
+        ]
 
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
 
@@ -1900,11 +1909,12 @@ class App(tk.Tk):
                     if txt1.lower() not in nombre.lower():
                         match = False
 
-                if match:
-                    filtrados.append(row)
+                (str(r[0]), float(r[1]), float(r[2]))
+                        (r[0], r[1], r[2])
 
-            poblar_tax_cobros(filtrados)
-
+        tbl = load_tax_pagos()  # dict { 'cuenta': pct_dbcr_decimal }
+        # convert to percentages for display
+        regs = [(num, tbl[num] * 100.0) for num in tbl]
         ent_cuenta.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
         ent_nombre.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
 
@@ -2141,9 +2151,9 @@ class App(tk.Tk):
                 if match and txt1:
                     nombre = self.plan.get(cuenta, '')
                     if txt1.lower() not in nombre.lower():
-                        match = False
+            regs = [(str(r[0]), float(r[1])) for r in originales]
 
-                if match:
+                        (r[0], r[1])
                     filtrados.append(row)
 
             poblar_tax_pagos(filtrados)

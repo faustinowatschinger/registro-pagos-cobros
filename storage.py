@@ -130,20 +130,11 @@ def load_tax_cobros():
 
 
 def save_tax_cobros(tax_tuple):
-    """Save decimals as percentages for persistence"""
+    """Persist tax percentages as entered (e.g. ``5`` for 5%)."""
     path = os.path.join(ensure_data_directory(), TAX_COBROS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_iibb, pct_dbcr in tax_tuple:
-            f.write(
-                repr(
-                    (
-                        num,
-                        float(pct_iibb) * 100.0,
-                        float(pct_dbcr) * 100.0,
-                    )
-                )
-                + "\n"
-            )
+            f.write(repr((num, float(pct_iibb), float(pct_dbcr))) + "\n")
     return True
 
 # Para Pagos (solo DByCR bancario)
@@ -163,11 +154,11 @@ def load_tax_pagos():
 
 
 def save_tax_pagos(tax_tuple):
-    """Persist decimals as percentages"""
+    """Persist tax percentage as entered."""
     path = os.path.join(ensure_data_directory(), TAX_PAGOS_FILE)
     with open(path, 'a', encoding='utf-8') as f:
         for num, pct_dbcr in tax_tuple:
-            f.write(repr((num, float(pct_dbcr) * 100.0)) + "\n")
+            f.write(repr((num, float(pct_dbcr))) + "\n")
     return True
 
 # --- Expensas -------------------------------------------------
