@@ -1085,9 +1085,9 @@ class App(tk.Tk):
         # Mantener saldos de expensas al día antes de aplicar pagos
         try:
             storage.update_expensas(self.plan)
-            for code, _, _, imp in imputaciones:
+            for code, _, fec_imp, imp in imputaciones:
                 if str(code).startswith('11-21-'):
-                    storage.apply_payment_expensa(code.strip(), imp)
+                    storage.apply_payment_expensa(code.strip(), imp, fec_imp)
         except Exception as e:
             print('Error actualizando expensas:', e)
         pct_iva = 0.21
@@ -2227,15 +2227,14 @@ class App(tk.Tk):
         ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
-        exp_dict = storage.load_expensas()
-        regs = [(c, *exp_dict[c]) for c in exp_dict]
-        # [(cuenta, mes, saldo), ...]
+        regs = storage.load_expensas()
+        # [(cuenta, fecha, monto), ...]
 
         if not regs:
             ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
             return
 
-        cols = ['Cuenta', 'Nombre', 'Mes', 'Saldo']
+        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
 
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
@@ -2307,9 +2306,9 @@ class App(tk.Tk):
         def poblar_exp(lista):
             for item in tree.get_children():
                 tree.delete(item)
-            for cuenta, mes, saldo in lista:
+            for cuenta, fecha, monto in lista:
                 nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, mes, saldo))
+                tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
 
         poblar_exp(regs)
 
@@ -2317,9 +2316,9 @@ class App(tk.Tk):
             filtros = {i: e.get() for i, e in filtro_entrys.items()}
             filtrados = []
             for row in regs:
-                cuenta, mes, saldo = row
+                cuenta, fecha, monto = row
                 nombre = self.plan.get(cuenta, '')
-                cells = [cuenta, nombre, mes, str(saldo)]
+                cells = [cuenta, nombre, fecha, str(monto)]
                 match = True
                 for idx, txt in filtros.items():
                     if not txt.strip():
@@ -2347,15 +2346,20 @@ class App(tk.Tk):
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
             vals = tree.item(sel[0], 'values')
-            cuenta = vals[0]
-            if not messagebox.askyesno('Confirmar', f'¿Eliminar registro de {cuenta}?'):
+            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
                 return
+            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
             d = storage.load_expensas()
-            if cuenta in d:
-                d.pop(cuenta)
+            idx = None
+            for i, r in enumerate(d):
+                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
+                    idx = i
+                    break
+            if idx is not None:
+                d.pop(idx)
                 storage.save_expensas(d)
             nonlocal regs
-            regs = [(c, *d[c]) for c in d]
+            regs = d
             self._load_data()
             poblar_exp(regs)
 
@@ -2367,41 +2371,47 @@ class App(tk.Tk):
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
             vals = tree.item(sel[0], 'values')
-            cuenta = vals[0]
+            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
             idx_reg = None
             for i, r in enumerate(regs):
-                if str(r[0]) == str(cuenta):
+                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
                     idx_reg = i
                     break
             if idx_reg is None:
                 return
 
-            orig = list(regs[idx_reg])
+            orig_vals = list(regs[idx_reg])
 
             win = tk.Toplevel(self)
             win.title('Editar expensa')
-            for i, col in enumerate(['Cuenta', 'Mes', 'Saldo']):
+            entries = []
+            for i, col in enumerate(['Cuenta', 'Fecha', 'Monto']):
                 ttk.Label(win, text=col+':', style='Field.TLabel').grid(row=i, column=0, sticky='e', padx=5, pady=2)
                 e = ttk.Entry(win, style='Field.TEntry')
                 e.grid(row=i, column=1, padx=5, pady=2)
-                e.insert(0, orig[i])
-                orig[i] = e
+                e.insert(0, orig_vals[i])
+                entries.append(e)
 
             def guardar():
-                cuenta_n = orig[0].get().strip()
-                mes_n = orig[1].get().strip()
+                cuenta_n = entries[0].get().strip()
+                fecha_n = entries[1].get().strip()
                 try:
-                    saldo_n = float(orig[2].get())
+                    monto_n = float(entries[2].get())
                 except ValueError:
-                    messagebox.showerror('Error', 'Saldo inválido')
+                    messagebox.showerror('Error', 'Monto inválido')
                     return
                 d = storage.load_expensas()
-                if cuenta != cuenta_n and cuenta in d:
-                    d.pop(cuenta)
-                d[cuenta_n] = [mes_n, saldo_n]
-                storage.save_expensas(d)
+                # encontrar registro nuevamente
+                idx = None
+                for i, r in enumerate(d):
+                    if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
+                        idx = i
+                        break
+                if idx is not None:
+                    d[idx] = (cuenta_n, fecha_n, monto_n)
+                    storage.save_expensas(d)
                 nonlocal regs
-                regs = [(c, *d[c]) for c in d]
+                regs = d
                 self._load_data()
                 poblar_exp(regs)
                 win.destroy()

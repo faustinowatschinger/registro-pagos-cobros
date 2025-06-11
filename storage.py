@@ -175,51 +175,59 @@ def save_tax_pagos(tax_tuple):
 EXPENSAS_FILE = 'expensas.txt'
 
 def load_expensas():
-    """Return dict {cuenta: [mes, saldo]}"""
+    """Return list of tuples [(cuenta, fecha, monto), ...]"""
     path = os.path.join(ensure_data_directory(), EXPENSAS_FILE)
-    data = {}
+    data = []
     if os.path.exists(path):
         for line in open(path, 'r', encoding='utf-8'):
             if not line.strip():
                 continue
             try:
-                cuenta, mes, saldo = ast.literal_eval(line)
+                cuenta, fecha, monto = ast.literal_eval(line)
             except Exception:
-                # Si un registro está corrupto, lo ignoramos
-                continue
-            data[str(cuenta)] = [str(mes), float(saldo)]
+                # Formato previo: dict {cuenta: [mes, saldo]}
+                try:
+                    cuenta, mes, saldo = ast.literal_eval(line)
+                    data.append((str(cuenta), str(mes), float(saldo)))
+                    continue
+                except Exception:
+                    continue
+            data.append((str(cuenta), str(fecha), float(monto)))
     return data
 
-def save_expensas(exp_dict):
+def save_expensas(exp_list):
     path = os.path.join(ensure_data_directory(), EXPENSAS_FILE)
     with open(path, 'w', encoding='utf-8') as f:
-        for cuenta, (mes, saldo) in exp_dict.items():
-            f.write(repr((cuenta, mes, saldo)) + "\n")
+        for rec in exp_list:
+            cuenta, fecha, monto = rec
+            f.write(repr((cuenta, fecha, monto)) + "\n")
     return True
 
 def update_expensas(plan_dict):
-    """Ensure expensa balances are updated for the current month."""
+    """Add a new positive entry each month for every expensa account."""
     exps = load_expensas()
     cur_month = datetime.date.today().strftime('%Y-%m')
     updated = False
+    # Determine last month recorded for each account
+    last_months = {}
+    for c, fecha, monto in exps:
+        if not str(c).startswith('11-21-'):
+            continue
+        mes = fecha[:7]
+        last_months[c] = max(mes, last_months.get(c, '0000-00'))
+
     for acc in plan_dict:
         if not str(acc).startswith('11-21-'):
             continue
-        if acc not in exps:
-            exps[acc] = [cur_month, -189000.0]
+        last = last_months.get(acc)
+        if last != cur_month:
+            exps.append((str(acc), cur_month, 33900.0))
             updated = True
-        else:
-            last_month, saldo = exps[acc]
-            if cur_month > last_month:
-                exps[acc] = [cur_month, saldo - 189000.0]
-                updated = True
     if updated:
         save_expensas(exps)
 
-def apply_payment_expensa(cuenta, amount):
+def apply_payment_expensa(cuenta, amount, fecha):
+    """Append a negative payment record for the given account."""
     exps = load_expensas()
-    if cuenta not in exps:
-        return
-    mes, saldo = exps[cuenta]
-    exps[cuenta] = [mes, saldo + float(amount)]
+    exps.append((str(cuenta), str(fecha), -abs(float(amount))))
     save_expensas(exps)
