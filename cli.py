@@ -519,6 +519,33 @@ class App(tk.Tk):
         # Asociamos el KeyRelease al entry de fecha
         entry_fecha.bind("<KeyRelease>", on_keyrelease_fecha)
 
+        def prepare_date_entry(ent):
+            hoy = datetime.date.today()
+            ent.insert(0, formatear_ddmmyyyy(hoy.strftime('%d%m%Y')))
+            def _on_keyrel(ev):
+                antiguo = ent.get()
+                pos_orig = ent.index('insert')
+                dig_antes = sum(ch.isdigit() for ch in antiguo[:pos_orig])
+                raw_nuevo = ''.join(filter(str.isdigit, antiguo))
+                if len(raw_nuevo) > 8:
+                    raw_nuevo = raw_nuevo[:8]
+                nuevo_texto = formatear_ddmmyyyy(raw_nuevo)
+                if dig_antes == 0:
+                    nueva_pos = 0
+                else:
+                    cont = 0
+                    nueva_pos = len(nuevo_texto)
+                    for i, ch in enumerate(nuevo_texto):
+                        if ch.isdigit():
+                            cont += 1
+                        if cont == dig_antes:
+                            nueva_pos = i + 1
+                            break
+                ent.delete(0, 'end')
+                ent.insert(0, nuevo_texto)
+                ent.icursor(nueva_pos)
+            ent.bind('<KeyRelease>', _on_keyrel)
+
         # --- Recibo ---
         recibo_frame = ttk.Frame(sec1)
         recibo_frame.grid(row=0, column=1, sticky='ew')
@@ -634,7 +661,7 @@ class App(tk.Tk):
         # — 4) Detalle de Imputaciones —
         det = ttk.Frame(cont, padding=5)
         det.pack(fill='x', pady=(0,10))
-        cols = ['N° de Cuenta','Concepto que abona','Fecha','Importe']
+        cols = ['N° de Cuenta','Concepto que abona','Fecha de lo que paga','Importe']
         for j, c in enumerate(cols):
             ttk.Label(det, text=c, style='Field.TLabel', borderwidth=1, relief='solid')\
                .grid(row=0, column=j, sticky='nsew', padx=1)
@@ -647,9 +674,10 @@ class App(tk.Tk):
             for j in range(4):
                 ent = ttk.Entry(det, style='Field.TEntry')
                 ent.grid(row=i, column=j, sticky='nsew', padx=1, pady=2)
-                # Si es la columna “Concepto” (j == 1), lo dejamos en readonly
                 if j == 1:
                     ent.config(state='readonly')
+                elif j == 2:
+                    prepare_date_entry(ent)
                 fila.append(ent)
             imps.append(fila)
 
