@@ -1106,12 +1106,14 @@ class App(tk.Tk):
             imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
             imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
             imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
-            cuentaA, montoA_val,
-            cuentaB, montoB_val,
-            monto_dbcr,   # DByCR en pesos (A+B)
-            monto_iibb,   # IIBB en pesos (A+B)
-            iva_val,      # IVA en pesos (A+B)
-            obs
+            cuentaA,
+            montoA_val,
+            cuentaB,
+            montoB_val,
+            monto_dbcr,
+            monto_iibb,
+            iva_val,
+            obs,
         )
         if save_cobros((c,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
