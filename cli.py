@@ -6,6 +6,14 @@ import datetime
 
 from model import cobro, pago, cliente
 import storage
+# Utility -------------------------------------------------------------
+def pct_str(x: float, dec=3) -> str:
+    """Return percentage string like '5,000' for 0.05."""
+    try:
+        return f"{float(x) * 100:.{dec}f}".replace('.', ',')
+    except Exception:
+        return ""
+
 from storage import(
     save_cobros, save_pagos, save_clients,
     load_plan_cuentas, load_tax_cobros, save_tax_cobros,
@@ -893,8 +901,8 @@ class App(tk.Tk):
                 cash_hide_id = None
             taxes = load_tax_cobros()
             matches = [
-                (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
-                for c in taxes
+                    pct_str(taxes[c][0]),
+                    pct_str(taxes[c][1]),
             ]
             if not matches:
                 return
@@ -916,7 +924,7 @@ class App(tk.Tk):
                 cash_tree.insert(
                     '',
                     'end',
-                    values=(c, n, f"{p_i:.3f}", f"{p_d:.3f}"),
+                    values=(c, n, p_i, p_d),
                 )
             cash_tree.pack(expand=True, fill='both')
             cash_tree.focus_set()
@@ -992,12 +1000,12 @@ class App(tk.Tk):
     
                 e_iibb.config(state='normal')
                 e_iibb.delete(0, 'end')
-                e_iibb.insert(0, f"{total_pct_iibb:.3f}")
+                e_iibb.insert(0, pct_str(total_pct_iibb))
                 e_iibb.config(state='readonly')
     
                 e_dby.config(state='normal')
                 e_dby.delete(0, 'end')
-                e_dby.insert(0, f"{total_pct_dbcr:.3f}")
+                e_dby.insert(0, pct_str(total_pct_dbcr))
                 e_dby.config(state='readonly')
     
                 e_iva.config(state='normal')
@@ -1375,7 +1383,7 @@ class App(tk.Tk):
 
                 e_dbcr_pct.config(state='normal')
                 e_dbcr_pct.delete(0, 'end')
-                e_dbcr_pct.insert(0, f"{pct_dbcr:.3f}")
+                e_dbcr_pct.insert(0, pct_str(pct_dbcr))
                 e_dbcr_pct.config(state='readonly')
 
                 e_iva_pct.config(state='normal')
@@ -1757,7 +1765,7 @@ class App(tk.Tk):
 
         # 3) Leo registros de disco
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-        tbl = load_tax_cobros()  # dict { 'cuenta': (iibb, dbcr) }
+            (num, tbl[num][0], tbl[num][1])
         regs = [(num, *tbl[num]) for num in tbl]
         # regs = [(cuenta, iibb_pct, dbcr_pct), ...]
 
@@ -1849,8 +1857,8 @@ class App(tk.Tk):
                     values=(
                         cuenta,
                         nombre,
-                        f"{iibb_pct:.3f}",
-                        f"{dbcr_pct:.3f}",
+                        pct_str(iibb_pct),
+                        pct_str(dbcr_pct),
                     ),
                 )
 
@@ -1917,7 +1925,7 @@ class App(tk.Tk):
 
             nonlocal regs
             regs = [
-                (str(r[0]), float(r[1]) * 100.0, float(r[2]) * 100.0)
+                (str(r[0]), float(r[1]), float(r[2]))
                 for r in originales
             ]
             aplicar_filtros_tax_cobros()
@@ -1958,12 +1966,16 @@ class App(tk.Tk):
 
             def guardar():
                 try:
-                    regs[idx_reg] = (e_c.get(), float(e_i.get()), float(e_d.get()))
+                    regs[idx_reg] = (
+                        e_c.get(),
+                        float(str(e_i.get()).replace(',', '.')),
+                        float(str(e_d.get()).replace(',', '.')),
+                    )
                     persist = [
                         (
                             r[0],
-                            float(r[1]) / 100.0,
-                            float(r[2]) / 100.0,
+                            float(r[1]),
+                            float(r[2]),
                         )
                         for r in regs
                     ]
@@ -1994,8 +2006,8 @@ class App(tk.Tk):
             command=lambda: (
                 save_tax_cobros(((
                     e_c.get(),
-                    float(e_i.get()) / 100.0,
-                    float(e_d.get()) / 100.0,
+                    float(str(e_i.get()).replace(',', '.')) / 100.0,
+                    float(str(e_d.get()).replace(',', '.')) / 100.0,
                 ),)),
                 messagebox.showinfo('Éxito', 'Registro Cobros agregado.'),
                 self._show_frame('tax_cobros')
@@ -2011,7 +2023,6 @@ class App(tk.Tk):
         lbl_title.pack(pady=10)
 
         full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-        tbl = load_tax_pagos()  # dict { 'cuenta': pct_dbcr }
         regs = [(num, tbl[num]) for num in tbl]
         # regs = [(cuenta, pct_dbcr), ...]
 
@@ -2102,7 +2113,7 @@ class App(tk.Tk):
                 tree.insert(
                     '',
                     'end',
-                    values=(cuenta, nombre, f"{pct_dbcr:.3f}"),
+                    values=(cuenta, nombre, pct_str(pct_dbcr)),
                 )
 
         poblar_tax_pagos(regs)
@@ -2168,7 +2179,7 @@ class App(tk.Tk):
 
             nonlocal regs
             regs = [
-                (str(r[0]), float(r[1]) * 100.0)
+                (str(r[0]), float(r[1]))
                 for r in originales
             ]
             aplicar_filtros_tax_pagos()
@@ -2203,11 +2214,14 @@ class App(tk.Tk):
 
             def guardar():
                 try:
-                    regs[idx_reg] = (e_c.get(), float(e_d.get()))
+                    regs[idx_reg] = (
+                        e_c.get(),
+                        float(str(e_d.get()).replace(',', '.')),
+                    )
                     persist = [
                         (
                             r[0],
-                            float(r[1]) / 100.0,
+                            float(r[1]),
                         )
                         for r in regs
                     ]
@@ -2234,7 +2248,10 @@ class App(tk.Tk):
             text='Agregar',
             style='Big.TButton',
             command=lambda: (
-                save_tax_pagos(((e_c.get(), float(e_d.get()) / 100.0),)),
+                save_tax_pagos(((
+                    e_c.get(),
+                    float(str(e_d.get()).replace(',', '.')) / 100.0,
+                ),)),
                 messagebox.showinfo('Éxito', 'Registro Pagos agregado.'),
                 self._show_frame('tax_pagos')
             )
