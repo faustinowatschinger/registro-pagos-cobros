@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Importa datos de LIQUIDACIONES ENERGIA.ods a data/liquidaciones_energia.txt.
-Si pandas no está disponible, usa un parser ODS simple."""
+Si pandas no está disponible, usa un parser ODS simple.
+Solo se consideran las primeras 342 filas y se descartan columnas vacías."""
 
 import os
 import zipfile
@@ -43,13 +44,26 @@ def _leer_ods_sin_pandas(path):
     return rows
 
 
+def _descartar_columnas_vacias(filas):
+    """Devuelve las filas solo con las columnas que tienen contenido."""
+    if not filas:
+        return filas
+    max_cols = max(len(f) for f in filas)
+    filas = [f + ("",) * (max_cols - len(f)) for f in filas]
+    keep = [i for i in range(max_cols) if any(row[i].strip() for row in filas)]
+    return [tuple(row[i] for i in keep) for row in filas]
+
+
 def importar_liquidaciones_desde_ods(ruta_ods):
     """Lee la planilla ODS y guarda cada fila como tupla en un TXT."""
     data_dir = ensure_data_directory()
     path_txt = os.path.join(data_dir, "liquidaciones_energia.txt")
 
     if pd is not None:
-        df = pd.read_excel(ruta_ods, engine="odf", dtype=str)
+        df = pd.read_excel(ruta_ods, engine="odf")
+        df = df.iloc[:342]  # limitar filas
+        # descartar columnas totalmente vacías
+        df = df.dropna(axis=1, how="all")
         filas = [
             tuple(
                 "" if val is None or (isinstance(val, float) and pd.isna(val)) else str(val).strip()
@@ -57,11 +71,11 @@ def importar_liquidaciones_desde_ods(ruta_ods):
             )
             for row in df.itertuples(index=False, name=None)
         ]
+        filas = _descartar_columnas_vacias(filas)
     else:
         filas = _leer_ods_sin_pandas(ruta_ods)
-
-    # Importar solo hasta la fila 342 (inclusive)
-    filas = filas[:342]
+        filas = filas[:342]
+        filas = _descartar_columnas_vacias(filas)
 
     with open(path_txt, "w", encoding="utf-8") as f_txt:
         importados = 0
