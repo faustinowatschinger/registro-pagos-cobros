@@ -1,37 +1,73 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Importa datos de LIQUIDACIONES ENERGIA.ods a data/liquidaciones_energia.txt."""
+"""Importa datos de LIQUIDACIONES ENERGIA.ods a data/liquidaciones_energia.txt.
+Si pandas no está disponible, usa un parser ODS simple."""
 
 import os
-import pandas as pd
+import zipfile
+import xml.etree.ElementTree as ET
+
+try:
+    import pandas as pd  # type: ignore
+except Exception:  # pandas no disponible
+    pd = None
 
 
 def ensure_data_directory():
     """Asegura que exista la carpeta data/ y devuelve su ruta."""
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
+
+
+def _leer_ods_sin_pandas(path):
+    """Lee un archivo ODS y devuelve una lista de filas (tuplas de celdas)."""
+    rows = []
+    with zipfile.ZipFile(path) as zf:
+        with zf.open("content.xml") as f:
+            tree = ET.parse(f)
+    root = tree.getroot()
+    ns = {
+        "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+        "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+    }
+    for row in root.findall(".//table:table-row", ns):
+        cells = []
+        for cell in row.findall("table:table-cell", ns):
+            repeat = int(cell.attrib.get(f"{{{ns['table']}}}number-columns-repeated", "1"))
+            text = "".join(p.text or "" for p in cell.findall("text:p", ns))
+            for _ in range(repeat):
+                cells.append(text)
+        if any(cells):
+            rows.append(tuple(cells))
+    return rows
 
 
 def importar_liquidaciones_desde_ods(ruta_ods):
     """Lee la planilla ODS y guarda cada fila como tupla en un TXT."""
     data_dir = ensure_data_directory()
-    path_txt = os.path.join(data_dir, 'liquidaciones_energia.txt')
+    path_txt = os.path.join(data_dir, "liquidaciones_energia.txt")
 
-    df = pd.read_excel(ruta_ods, engine='odf', dtype=str)
+    if pd is not None:
+        df = pd.read_excel(ruta_ods, engine="odf", dtype=str)
+        filas = [
+            tuple("" if val is None or (isinstance(val, float) and pd.isna(val)) else str(val).strip() for val in row)
+            for row in df.itertuples(index=False, name=None)
+        ]
+    else:
+        filas = _leer_ods_sin_pandas(ruta_ods)
 
-    importados = 0
-    with open(path_txt, 'w', encoding='utf-8') as f_txt:
-        for row in df.itertuples(index=False, name=None):
-            fila = tuple('' if val is None or (isinstance(val, float) and pd.isna(val)) else str(val).strip() for val in row)
+    with open(path_txt, "w", encoding="utf-8") as f_txt:
+        importados = 0
+        for fila in filas:
             if not any(fila):
                 continue
-            f_txt.write(repr(fila) + '\n')
+            f_txt.write(repr(fila) + "\n")
             importados += 1
 
     print(f"Se importaron {importados} registros en:\n  {path_txt}")
 
 
-if __name__ == '__main__':
-    ruta_ods = os.path.join(os.path.dirname(__file__), 'LIQUIDACIONES ENERGIA.ods')
+if __name__ == "__main__":
+    ruta_ods = os.path.join(os.path.dirname(__file__), "LIQUIDACIONES ENERGIA.ods")
     importar_liquidaciones_desde_ods(ruta_ods)
