@@ -5,15 +5,22 @@ from tkinter import ttk, messagebox
 import datetime
 
 from model import cobro, pago, cliente
-from storage import (
+import storage
+# Utility -------------------------------------------------------------
+def pct_str(x: float, dec=3) -> str:
+    """Return percentage string like '5,000' for 0.05."""
+    try:
+        return f"{float(x) * 100:.{dec}f}".replace('.', ',')
+    except Exception:
+        return ""
+
+from storage import(
     save_cobros, save_pagos, save_clients,
     load_plan_cuentas, load_tax_cobros, save_tax_cobros,
     load_tax_pagos, save_tax_pagos,
     save_plan_cuentas,
     get_next_cobro_id, get_next_pago_id, get_next_clients_id,
-    ensure_data_directory
-)
-
+    ensure_data_directory)
 BRANCH_CODE = "0001"
 
 # Estilos globales
@@ -98,7 +105,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('Sistema de Cobros y Pagos')
-        self.state('zoomed')
+        try:
+            self.state('zoomed')
+        except tk.TclError:
+            # Some environments (like Xvfb) do not support this state
+            pass
         build_styles(self)
 
         # Cargo datos iniciales
@@ -112,7 +123,7 @@ class App(tk.Tk):
         for name in [
             'cobro', 'pago', 'cliente',
             'lst_cobros', 'lst_pagos', 'lst_clientes',
-            'plan', 'tax_cobros', 'tax_pagos'
+            'plan', 'tax_cobros', 'tax_pagos', 'expensas'
         ]:
             self.frames[name] = ttk.Frame(self.content)
 
@@ -126,6 +137,7 @@ class App(tk.Tk):
         self._build_plan(self.frames['plan'])
         self._build_tax_cobros(self.frames['tax_cobros'])
         self._build_tax_pagos(self.frames['tax_pagos'])
+        self._build_expensas(self.frames['expensas'])
 
         # 4) Al arrancar, muestro sólo la vista "cobro"
         self._show_frame('cobro')
@@ -141,7 +153,7 @@ class App(tk.Tk):
             str(pc[0]): pc[1]
             for pc in load_plan_cuentas()
         }
-
+        storage.update_expensas(self.plan)
 
     def _build_ui(self):
         # Contenedor lateral de navegación
@@ -159,6 +171,7 @@ class App(tk.Tk):
             ('Plan Ctas', 'plan'),
             ('Imp. Cobros', 'tax_cobros'),
             ('Imp. Pagos',  'tax_pagos'),
+            ('Expensas',   'expensas'),
         ]
         for txt, name in pages:
             ttk.Button(
@@ -186,8 +199,10 @@ class App(tk.Tk):
             self._build_tax_cobros(self.frames[name])
         elif name == 'tax_pagos':
             self._build_tax_pagos(self.frames[name])
-        elif name == 'plan':                      
+        elif name == 'plan':
             self._build_plan(self.frames[name])
+        elif name == 'expensas':
+            self._build_expensas(self.frames[name])
 
         # 3) Finalmente, empaco (pack) solo el frame que quiero mostrar
         self.frames[name].pack(expand=True, fill='both')
@@ -224,9 +239,9 @@ class App(tk.Tk):
         headers_map = {
             'cobros.txt': [
                 'ID','Fecha','Nombre y Apellido','Parcela',
-                'Imp1 Cod','Imp1 Desc','Imp1 Importe',
-                'Imp2 Cod','Imp2 Desc','Imp2 Importe',
-                'Imp3 Cod','Imp3 Desc','Imp3 Importe',
+                'Imp1 Cod','Imp1 Desc','Imp1 Fec','Imp1 Importe',
+                'Imp2 Cod','Imp2 Desc','Imp2 Fec','Imp2 Importe',
+                'Imp3 Cod','Imp3 Desc','Imp3 Fec','Imp3 Importe',
                 'Cuenta A','Monto A','Cuenta B','Monto B',
                 'DByCR %','IIBB %','IVA %','Observaciones'
             ],
@@ -408,6 +423,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=len(headers), column=0, columnspan=2, pady=10)
 
         boton_editar.config(command=editar_seleccionado)
+        tree.bind('<Double-1>', lambda e: editar_seleccionado())
 
 
 
@@ -418,7 +434,7 @@ class App(tk.Tk):
     
         # 1) Contenedor principal dentro de “parent”
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
     
         # 2) Título
         ttk.Label(cont, text='Registro Ingreso', style='Title.TLabel').pack(pady=(0,20))
@@ -510,6 +526,31 @@ class App(tk.Tk):
         
         # Asociamos el KeyRelease al entry de fecha
         entry_fecha.bind("<KeyRelease>", on_keyrelease_fecha)
+
+        def prepare_date_entry(ent):
+            def _on_keyrel(ev):
+                antiguo = ent.get()
+                pos_orig = ent.index('insert')
+                dig_antes = sum(ch.isdigit() for ch in antiguo[:pos_orig])
+                raw_nuevo = ''.join(filter(str.isdigit, antiguo))
+                if len(raw_nuevo) > 8:
+                    raw_nuevo = raw_nuevo[:8]
+                nuevo_texto = formatear_ddmmyyyy(raw_nuevo)
+                if dig_antes == 0:
+                    nueva_pos = 0
+                else:
+                    cont = 0
+                    nueva_pos = len(nuevo_texto)
+                    for i, ch in enumerate(nuevo_texto):
+                        if ch.isdigit():
+                            cont += 1
+                        if cont == dig_antes:
+                            nueva_pos = i + 1
+                            break
+                ent.delete(0, 'end')
+                ent.insert(0, nuevo_texto)
+                ent.icursor(nueva_pos)
+            ent.bind('<KeyRelease>', _on_keyrel)
 
         # --- Recibo ---
         recibo_frame = ttk.Frame(sec1)
@@ -626,22 +667,23 @@ class App(tk.Tk):
         # — 4) Detalle de Imputaciones —
         det = ttk.Frame(cont, padding=5)
         det.pack(fill='x', pady=(0,10))
-        cols = ['N° de Cuenta','Concepto que abona','Importe']
+        cols = ['N° de Cuenta','Concepto que abona','Fecha de lo que paga','Importe']
         for j, c in enumerate(cols):
             ttk.Label(det, text=c, style='Field.TLabel', borderwidth=1, relief='solid')\
                .grid(row=0, column=j, sticky='nsew', padx=1)
             det.columnconfigure(j, weight=1)
-    
-        # Creamos 3 filas (cada fila = [Entry de código, Entry de concepto (readonly), Entry de importe])
+
+        # Creamos 3 filas (código, concepto, fecha, importe)
         imps = []
         for i in range(1, 4):
             fila = []
-            for j in range(3):
+            for j in range(4):
                 ent = ttk.Entry(det, style='Field.TEntry')
                 ent.grid(row=i, column=j, sticky='nsew', padx=1, pady=2)
-                # Si es la columna “Concepto” (j == 1), lo dejamos en readonly
                 if j == 1:
                     ent.config(state='readonly')
+                elif j == 2:
+                    prepare_date_entry(ent)
                 fila.append(ent)
             imps.append(fila)
 
@@ -664,14 +706,29 @@ class App(tk.Tk):
                 e_nombre.after_cancel(acc_hide_id)
             acc_hide_id = e_nombre.after(150, hide_acc_popup)
 
-        def show_acc_popup(code_entry, name_entry, event=None):
-            nonlocal acc_win, acc_tree
-            cli_name = e_nombre.get().strip().lower()
-            if not cli_name:
+        def cancel_hide_acc(event=None):
+            nonlocal acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+                acc_hide_id = None
+
+        def show_acc_popup(code_entry, name_entry, date_entry, event=None):
+            nonlocal acc_win, acc_tree, acc_hide_id
+            if acc_hide_id:
+                e_nombre.after_cancel(acc_hide_id)
+                acc_hide_id = None
+            
+            cli_num = e_cli.get().strip()
+            if not cli_num:
                 return
+            suf = '-' + str(cli_num).zfill(3)
+            prefixes = (
+                '11-21', '11-22', '11-24',
+                '11-25', '11-26', '21-20', '21-30'
+            )
             matches = [
                 (c, n) for c, n in self.plan.items()
-                if cli_name in n.lower()
+                if str(c).endswith(suf) and any(str(c).startswith(p) for p in prefixes)
             ]
             if not matches:
                 return
@@ -693,6 +750,7 @@ class App(tk.Tk):
                 acc_tree.insert('', 'end', values=(c, n))
             acc_tree.pack(expand=True, fill='both')
             acc_tree.focus_set()
+            cancel_hide_acc()
 
             def choose_account(ev=None):
                 sel = acc_tree.selection()
@@ -704,6 +762,8 @@ class App(tk.Tk):
                     name_entry.delete(0, 'end')
                     name_entry.insert(0, nombre)
                     name_entry.config(state='readonly')
+                    if not date_entry.get().strip():
+                        date_entry.insert(0, entry_fecha.get())
                     code_entry.focus_set()
                 hide_acc_popup()
 
@@ -711,29 +771,35 @@ class App(tk.Tk):
             acc_tree.bind('<Return>', choose_account)
             acc_tree.bind('<Escape>', lambda e: hide_acc_popup())
             acc_tree.bind('<FocusOut>', hide_acc_popup_later)
+            acc_tree.bind('<FocusIn>', cancel_hide_acc)
 
             x = name_entry.winfo_rootx()
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
             acc_win.geometry(f'+{x}+{y}')   
     
-        def fill_con(event, codigo_entry, concepto_entry):
+        def fill_con(event, codigo_entry, concepto_entry, fecha_entry=None):
             clave = codigo_entry.get().strip()
             nombre = self.plan.get(clave, '')
-            # Abrimos temporalmente el Entry de “Concepto” para insertar el texto
             concepto_entry.config(state='normal')
             concepto_entry.delete(0, 'end')
             concepto_entry.insert(0, nombre)
             concepto_entry.config(state='readonly')
+            if fecha_entry and not fecha_entry.get().strip():
+                fecha_entry.insert(0, entry_fecha.get())
     
         # Enlazar cada Entry de código con fill_con
-        for ent_codigo, ent_concepto, ent_importe in imps:
-            ent_concepto.bind('<Button-1>', lambda e, c=ent_codigo, o=ent_concepto: show_acc_popup(c, o))
+        for fila in imps:
+            ent_codigo, ent_concepto, ent_fecha = fila[0], fila[1], fila[2]
+            ent_concepto.bind(
+                '<Button-1>',
+                lambda e, c=ent_codigo, o=ent_concepto, f=ent_fecha: show_acc_popup(c, o, f)
+            )
             ent_concepto.bind('<FocusOut>', hide_acc_popup_later)
     
         # — 5) Total — (debajo de las imputaciones)
-        ttk.Label(det, text='TOTAL:', style='Field.TLabel').grid(row=4, column=1, sticky='e')
+        ttk.Label(det, text='TOTAL:', style='Field.TLabel').grid(row=4, column=2, sticky='e')
         l_tot = ttk.Label(det, text='0.00', style='Field.TLabel')
-        l_tot.grid(row=4, column=2, sticky='e', padx=1)
+        l_tot.grid(row=4, column=3, sticky='e', padx=1)
 
         # — 5.1) CARGA IMPOSITIVA —
         taxf = ttk.LabelFrame(cont, text='CARGA IMPOSITIVA', padding=5)
@@ -822,15 +888,31 @@ class App(tk.Tk):
                 self.after_cancel(cash_hide_id)
             cash_hide_id = self.after(150, hide_cash_popup)
 
+        def cancel_hide_cash(event=None):
+            nonlocal cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+                cash_hide_id = None
+
         def show_cash_popup(code_entry, name_entry, event=None):
-            nonlocal cash_win, cash_tree
-            taxes = load_tax_cobros()
+            nonlocal cash_win, cash_tree, cash_hide_id
+            if cash_hide_id:
+                self.after_cancel(cash_hide_id)
+                cash_hide_id = None
+            taxes = load_tax_cobros()                # {'11-10-021': (0.05, 0.0), ...}
+            
+            # armamos tuplas: (cod-cta, nombre, %IIBB str, %DByCR str)
             matches = [
-                (c, self.plan.get(c, ''), taxes[c][0], taxes[c][1])
+                (c,
+                 self.plan.get(c, ''),              # nombre de la cuenta
+                 pct_str(taxes[c][0]),              # 0.05  -> '5,000'
+                 pct_str(taxes[c][1]))              # 0.006 -> '0,600'
                 for c in taxes
             ]
+            
             if not matches:
-                return
+                return     
+
             if cash_win:
                 cash_win.destroy()
             cash_win = tk.Toplevel(self)
@@ -846,9 +928,14 @@ class App(tk.Tk):
                 cash_tree.heading(h, text=h)
                 cash_tree.column(h, width=w, anchor='center')
             for c, n, p_i, p_d in matches:
-                cash_tree.insert('', 'end', values=(c, n, f"{p_i:.2f}", f"{p_d:.2f}"))
+                cash_tree.insert(
+                    '',
+                    'end',
+                    values=(c, n, p_i, p_d),
+                )
             cash_tree.pack(expand=True, fill='both')
             cash_tree.focus_set()
+            cancel_hide_cash()
 
             def choose_cash(ev=None):
                 sel = cash_tree.selection()
@@ -869,6 +956,7 @@ class App(tk.Tk):
             cash_tree.bind('<Return>', choose_cash)
             cash_tree.bind('<Escape>', lambda e: hide_cash_popup())
             cash_tree.bind('<FocusOut>', hide_cash_popup_later)
+            cash_tree.bind('<FocusIn>', cancel_hide_cash)
 
             x = name_entry.winfo_rootx()
             y = name_entry.winfo_rooty() + name_entry.winfo_height()
@@ -884,7 +972,7 @@ class App(tk.Tk):
         def upd_tot(e=None):
             try:
                 # 1) (Opcional) Subtotal de imputaciones
-                subtotal_imput = sum(float(r[2].get() or 0) for r in imps)
+                subtotal_imput = sum(float(r[3].get() or 0) for r in imps)
                 l_tot.config(text=f"{subtotal_imput:.2f}")
     
                 # 2) Obtener porcentajes IIBB / DByCR para Cuenta A y Cuenta B
@@ -903,14 +991,14 @@ class App(tk.Tk):
                     montoB_val = 0.0
     
                 # 4) Calcular IIBB y DByCR sobre Monto A y Monto B
-                monto_iibb_A  = montoA_val * (pA_iibb / 100)
-                monto_dbcr_A  = montoA_val * (pA_dbcr / 100)
-                monto_iibb_B  = montoB_val * (pB_iibb / 100)
-                monto_dbcr_B  = montoB_val * (pB_dbcr / 100)
+                monto_iibb_A  = montoA_val * pA_iibb
+                monto_dbcr_A  = montoA_val * pA_dbcr
+                monto_iibb_B  = montoB_val * pB_iibb
+                monto_dbcr_B  = montoB_val * pB_dbcr
     
                 # 5) Calcular IVA (21%) **sobre el monto de cada cuenta**, no sobre el subtotal de imputaciones
-                pct_iva = 21.0
-                base_sin_iva = subtotal_imput / 1.21 if subtotal_imput else 0.0
+                pct_iva = 0.21
+                base_sin_iva = subtotal_imput / (1 + pct_iva) if subtotal_imput else 0.0
                 monto_iva = subtotal_imput - base_sin_iva
     
                 # 6) Mostrar los porcentajes combinados (suman de A+B)
@@ -919,12 +1007,12 @@ class App(tk.Tk):
     
                 e_iibb.config(state='normal')
                 e_iibb.delete(0, 'end')
-                e_iibb.insert(0, f"{total_pct_iibb:.2f}")
+                e_iibb.insert(0, pct_str(total_pct_iibb))
                 e_iibb.config(state='readonly')
     
                 e_dby.config(state='normal')
                 e_dby.delete(0, 'end')
-                e_dby.insert(0, f"{total_pct_dbcr:.2f}")
+                e_dby.insert(0, pct_str(total_pct_dbcr))
                 e_dby.config(state='readonly')
     
                 e_iva.config(state='normal')
@@ -951,8 +1039,8 @@ class App(tk.Tk):
                 pass
     
         # Vincular eventos a upd_tot (DEBE SER DESPUÉS de definirla)
-        for _, _, ent_importe in imps:
-            ent_importe.bind('<KeyRelease>', upd_tot)
+        for fila in imps:
+            fila[-1].bind('<KeyRelease>', upd_tot)
         ca.bind('<KeyRelease>', upd_tot)
         ma.bind('<KeyRelease>', upd_tot)
         cb.bind('<KeyRelease>', upd_tot)
@@ -966,7 +1054,12 @@ class App(tk.Tk):
                            entry_fecha.get(),
                            e_nombre.get(), e_par.get(),
                            [
-                               (imps[i][0].get(), imps[i][1].get(), float(imps[i][2].get() or 0))
+                               (
+                                   imps[i][0].get(),
+                                   imps[i][1].get(),
+                                   imps[i][2].get(),
+                                   float(str(imps[i][3].get()).replace(',', '.') or 0)
+                               )
                                for i in range(3)
                            ],
                            ca.get(), ma.get(),
@@ -980,11 +1073,25 @@ class App(tk.Tk):
 
     def _save_cobro(self, fecha, nombre_cli, parcela, imputaciones,
                     cuentaA, montoA, cuentaB, montoB, obs):
-        total_imputaciones = sum(imp[2] for imp in imputaciones)
+        """Persist a new cobro record.
+
+        Parameters mirror the cobro constructor and each record is built using
+        named arguments so every required field (including ``observaciones``)
+        is supplied.
+        """
+        total_imputaciones = sum(imp[3] for imp in imputaciones)
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
 
-        if round(total_imputaciones, 2) != round(montoA_val + montoB_val, 2):
+        pct_iva = 0.21
+        # Calcular IVA sobre el total de imputaciones
+        try:
+            base_sin_iva = total_imputaciones / (1 + pct_iva) if total_imputaciones else 0.0
+        except Exception:
+            base_sin_iva = total_imputaciones / 1.21 if total_imputaciones else 0.0
+        iva_val = total_imputaciones - base_sin_iva
+
+        if abs(total_imputaciones - (montoA_val + montoB_val)) > 0.01:
             messagebox.showerror(
                 'Error',
                 'La suma de "Monto A" y "Monto B" debe coincidir con el total de imputaciones.'
@@ -996,38 +1103,43 @@ class App(tk.Tk):
         pB_iibb, pB_dbcr = tbl.get(cuentaB.strip(), (0.0, 0.0))
 
         # Montos de impuestos IIBB / DByCR por cuenta
-        monto_iibb_A  = montoA_val * (pA_iibb  / 100)
-        monto_dbcr_A  = montoA_val * (pA_dbcr  / 100)
-        monto_iibb_B  = montoB_val * (pB_iibb  / 100)
-        monto_dbcr_B  = montoB_val * (pB_dbcr  / 100)
+        monto_iibb_A  = montoA_val * pA_iibb
+        monto_dbcr_A  = montoA_val * pA_dbcr
+        monto_iibb_B  = montoB_val * pB_iibb
+        monto_dbcr_B  = montoB_val * pB_dbcr
 
         monto_iibb = monto_iibb_A + monto_iibb_B
         monto_dbcr = monto_dbcr_A + monto_dbcr_B
 
-        # IVA 21% **sobre montoA y montoB**, no sobre total de imputaciones
-        pct_iva = 21.0
-        base_sin_iva = total_imputaciones / 1.21 if total_imputaciones else 0.0
-        iva_val = total_imputaciones - base_sin_iva
-
-        # Construir el objeto cobro con los impuestos ya en pesos
-        c = cobro(
-            get_next_cobro_id(),
+        # Mantener saldos de expensas al día antes de aplicar pagos
+        try:
+            storage.update_expensas(self.plan)
+            for code, _, fec_imp, imp in imputaciones:
+                if str(code).startswith('11-21-'):
+                    storage.apply_payment_expensa(code.strip(), imp, fec_imp)
+        except Exception as e:
+            print('Error actualizando expensas:', e)
+        cobro_rec = cobro(
             fecha,
             nombre_cli,
             parcela,
             # … campos de imputaciones …
-            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2],
-            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2],
-            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2],
-            cuentaA, montoA_val,
-            cuentaB, montoB_val,
-            monto_dbcr,   # DByCR en pesos (A+B)
-            monto_iibb,   # IIBB en pesos (A+B)
-            iva_val,      # IVA en pesos (A+B)
-            obs
+            imputaciones[0][0], imputaciones[0][1], imputaciones[0][2], imputaciones[0][3],
+            imputaciones[1][0], imputaciones[1][1], imputaciones[1][2], imputaciones[1][3],
+            imputaciones[2][0], imputaciones[2][1], imputaciones[2][2], imputaciones[2][3],
+            cuentaA,
+            montoA_val,
+            cuentaB,
+            montoB_val,
+            monto_dbcr,
+            monto_iibb,
+            iva_val,
+            obs,
         )
-        save_cobros((c,))
-        messagebox.showinfo('Éxito', 'Cobro guardado.')
+        if save_cobros((c,)):
+            messagebox.showinfo('Éxito', 'Cobro guardado.')
+        else:
+            messagebox.showerror('Error', 'No se pudo guardar el cobro.')
         self._load_data()
         self._show_frame('lst_cobros')
 
@@ -1042,11 +1154,23 @@ class App(tk.Tk):
 
         # 2) Contenedor principal centrado
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
 
         # 3) Título
-        ttk.Label(cont, text='Registro Egreso', style='Title.TLabel')\
-            .pack(pady=(0,20))
+        ttk.Label(cont, text='Registro Egreso', style='Title.TLabel').pack(pady=(0,20))
+
+        # --- Encabezado (igual que en Registro Cobros) ---
+        header = ttk.Frame(cont, padding=(0,10))
+        header.pack(fill='x')
+        left = ttk.Frame(header)
+        left.pack(side='left', padx=5)
+        ttk.Label(left, text='BIOCULTIVOS SAS', style='Title.TLabel').pack(anchor='w')
+        ttk.Label(left, text='CUIT 30-71841359-8', style='Header.TLabel').pack(anchor='w')
+        right = ttk.Frame(header)
+        right.pack(side='right', padx=5)
+        ttk.Label(right, text='Condominio El Michay', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='Chacra 032-E-007-01C', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='General Fernández Oro (R.N.)', style='Header.TLabel').pack(anchor='e')
 
         # 4) Fecha y Número de Pago
         sec1 = ttk.Frame(cont, padding=5)
@@ -1180,42 +1304,46 @@ class App(tk.Tk):
         l_total = ttk.Label(sec3, text='0.00', style='Field.TLabel')
         l_total.grid(row=5, column=2, sticky='w')
 
-        # --- Fila “paga” (cuenta que paga / impuestos) ---
-        ttk.Label(sec3, text='Cuenta Pagadora', style='Field.TLabel', borderwidth=1, relief='solid')\
-           .grid(row=6, column=0, sticky='nsew', padx=1)
+        # --- Cuenta desde donde se paga ---
+        ttk.Label(cont, text='CAJA O CUENTA BANCARIA DESDE DONDE SE PAGA', style='Field.TLabel').pack(fill='x', pady=(5,0))
+        sec4 = ttk.Frame(cont, padding=5)
+        sec4.pack(fill='x', pady=(0,10))
+        for j, h in enumerate(['Cuenta Pagadora','Denominación','Imp. a Pagar %']):
+            ttk.Label(sec4, text=h, style='Field.TLabel', borderwidth=1, relief='solid')\
+               .grid(row=0, column=j, sticky='nsew', padx=1)
+            sec4.columnconfigure(j, weight=1)
 
-        pago_cuenta_var = tk.StringVar()
-        pago_cuenta = ttk.Combobox(sec3, textvariable=pago_cuenta_var, state='readonly', style='Field.TEntry')
-        pay_opts = []
+        pago_cuenta = ttk.Entry(sec4, style='Field.TEntry', state='readonly')
+        pago_cuenta.grid(row=1, column=0, sticky='nsew', padx=1, pady=2)
+
+        pago_denom_var = tk.StringVar()
+        pago_denom = ttk.Combobox(sec4, textvariable=pago_denom_var, state='readonly', style='Field.TEntry')
+        pay_codes = []
+        pay_names = []
         for i in range(1,31):
             code = f"11-10-{i:03d}"
             name = self.plan.get(code)
             if name:
-                pay_opts.append(f"{code} {name}")
-        pago_cuenta['values'] = pay_opts
-        pago_cuenta.grid(row=7, column=0, sticky='nsew', padx=1, pady=2)
+                pay_codes.append(code)
+                pay_names.append(name)
+        code_by_name = {n: c for c, n in zip(pay_codes, pay_names)}
+        pago_denom['values'] = pay_names
+        pago_denom.grid(row=1, column=1, sticky='nsew', padx=1, pady=2)
 
-        pago_denom = ttk.Entry(sec3, style='Field.TEntry', state='readonly')
-        pago_denom.grid(row=7, column=1, sticky='nsew', padx=1, pady=2)
+        e_dbcr_pct = ttk.Entry(sec4, style='Field.TEntry', width=10, state='readonly')
+        e_dbcr_pct.grid(row=1, column=2, sticky='w', padx=(1,0))
+        ttk.Label(sec4, text='Monto DByCR:', style='Field.TLabel')\
+           .grid(row=2, column=0, sticky='e', padx=(5,1))
+        l_dbcr = ttk.Label(sec4, text='0.00', style='Field.TLabel')
+        l_dbcr.grid(row=2, column=1, sticky='w')
 
-        # — Campos de DByCR e IVA —
-        ttk.Label(sec3, text='DByCR:', style='Field.TLabel')\
-           .grid(row=8, column=0, sticky='e', padx=(5,1))
-        e_dbcr_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
-        e_dbcr_pct.grid(row=8, column=1, sticky='w', padx=(1,0))
-        l_dbcr = ttk.Label(sec3, text='0.00', style='Field.TLabel')
-        l_dbcr.grid(row=8, column=2, sticky='w')
+        ttk.Label(sec4, text='% IVA:', style='Field.TLabel')\
+           .grid(row=3, column=0, sticky='e', padx=(5,1))
+        e_iva_pct = ttk.Entry(sec4, style='Field.TEntry', width=10, state='readonly')
+        e_iva_pct.grid(row=3, column=1, sticky='w', padx=(1,0))
 
-        ttk.Label(sec3, text='% IVA:', style='Field.TLabel')\
-           .grid(row=9, column=0, sticky='e', padx=(5,1))
-        e_iva_pct = ttk.Entry(sec3, style='Field.TEntry', width=10, state='readonly')
-        e_iva_pct.grid(row=9, column=1, sticky='w', padx=(1,0))
-
-        # — Campo de Total con Impuestos —
-        ttk.Label(sec3, text='TOTAL c/ Impuestos:', style='Field.TLabel')\
-           .grid(row=10, column=1, sticky='e', pady=(10,0))
-        l_total_imp = ttk.Label(sec3, text='0.00', style='Field.TLabel')
-        l_total_imp.grid(row=10, column=2, columnspan=2, sticky='w', pady=(10,0), padx=(5,0))
+        # espacio extra inferior
+        ttk.Label(sec4, text='').grid(row=4, column=0, pady=(5,0))
 
         # 7) Autocompletar denominaciones y calcular impuestos
         def fill_imput(e):
@@ -1230,16 +1358,15 @@ class App(tk.Tk):
         imput_cuenta.bind('<KeyRelease>', fill_imput)
 
         def fill_pago(e):
-            val = pago_cuenta_var.get()
-            code = val.split()[0] if val else ''
-            name = self.plan.get(code, '')
-            pago_denom.config(state='normal')
-            pago_denom.delete(0, 'end')
-            pago_denom.insert(0, name)
-            pago_denom.config(state='readonly')
+            name = pago_denom_var.get()
+            code = code_by_name.get(name, '')
+            pago_cuenta.config(state='normal')
+            pago_cuenta.delete(0, 'end')
+            pago_cuenta.insert(0, code)
+            pago_cuenta.config(state='readonly')
             upd_tot()
 
-        pago_cuenta.bind('<<ComboboxSelected>>', fill_pago)
+        pago_denom.bind('<<ComboboxSelected>>', fill_pago)
 
         def upd_tot(e=None):
             try:
@@ -1255,16 +1382,15 @@ class App(tk.Tk):
                 total_val = neto_val + iva_val
 
                 tblp = load_tax_pagos()
-                val = pago_cuenta_var.get()
-                code = val.split()[0] if val else ''
+                code = pago_cuenta.get().strip()
                 pct_dbcr = tblp.get(code, 0.0)
 
-                pct_iva = 21.0
-                monto_dbcr = total_val * (pct_dbcr / 100)
+                pct_iva = 0.21
+                monto_dbcr = total_val * pct_dbcr
 
                 e_dbcr_pct.config(state='normal')
                 e_dbcr_pct.delete(0, 'end')
-                e_dbcr_pct.insert(0, f"{pct_dbcr:.2f}")
+                e_dbcr_pct.insert(0, pct_str(pct_dbcr))
                 e_dbcr_pct.config(state='readonly')
 
                 e_iva_pct.config(state='normal')
@@ -1274,7 +1400,6 @@ class App(tk.Tk):
 
                 l_total.config(text=f"{total_val:.2f}")
                 l_dbcr.config(text=f"{monto_dbcr:.2f}")
-                l_total_imp.config(text=f"{total_val + monto_dbcr:.2f}")
             except Exception:
                 pass
 
@@ -1294,7 +1419,7 @@ class App(tk.Tk):
                            imput_cuenta.get().strip(),       # cuenta imputación (sin impuesto)
                            float(imput_imp.get() or 0),      # monto neto
                            float(iva_imp.get() or 0),        # IVA de la factura
-                           pago_cuenta_var.get().split()[0] if pago_cuenta_var.get() else '',
+                           pago_cuenta.get().strip(),
                            None
                        )
                    )).pack(pady=15)
@@ -1307,7 +1432,7 @@ class App(tk.Tk):
 
         # 2) Calcular monto DByCR sobre (neto + IVA)
         total_val = monto_neto + monto_iva_val
-        monto_dbcr_val = total_val * (pct_dbcr / 100)
+        monto_dbcr_val = total_val * pct_dbcr
 
         # 3) Crear objeto pago con los valores en pesos
         p = pago(
@@ -1334,7 +1459,7 @@ class App(tk.Tk):
             w.destroy()
 
         cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.place(relx=0.5, rely=0.5, anchor='center')
+        cont.pack(expand=True, fill='both', padx=10, pady=10)
 
         ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel').pack(pady=(0,20))
 
@@ -1517,7 +1642,7 @@ class App(tk.Tk):
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=150, anchor='center')
+            tree.column(c, width=150, anchor='center', stretch=True)
 
         # Función para llenar el Treeview
         def poblar_plan(lista):
@@ -1569,8 +1694,7 @@ class App(tk.Tk):
             nuevos = [r for r in actuales if str(r[0]) != str(num_cuenta)]
             overwrite_records(full_path, nuevos)
 
-            nonlocal regs
-            regs = nuevos
+            regs[:] = nuevos
             aplicar_filtros_plan()
 
         btn_elim.config(command=eliminar_plan)
@@ -1613,6 +1737,7 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
 
         btn_edit.config(command=editar_plan)
+        tree.bind('<Double-1>', lambda e: editar_plan())
 
         # Formulario para agregar nuevas cuentas (row=5)
         frm2 = ttk.Frame(cont, padding=5)
@@ -1646,11 +1771,11 @@ class App(tk.Tk):
 
         # 3) Leo registros de disco
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-        tbl = load_tax_cobros()  # dict { 'cuenta': (iibb, dbcr) }
-        regs = [(num, *tbl[num]) for num in tbl]
-        # regs = [(cuenta, iibb_pct, dbcr_pct), ...]
-
-        # 4) Columnas definidas (se mostrarán: Cuenta, Nombre, %IIBB, %DByCR)
+        tax_data = load_tax_cobros()  # { 'cuenta': (iibb_decimal, dbcr_decimal) }
+        regs = [
+            (str(num), float(vals[0]), float(vals[1]))
+            for num, vals in tax_data.items()
+        ]
         cols = ['Cuenta', 'Nombre', '%IIBB', '%DByCR']
 
         cont.grid_columnconfigure(0, weight=1)
@@ -1732,7 +1857,16 @@ class App(tk.Tk):
             for row in lista:
                 cuenta, iibb_pct, dbcr_pct = row
                 nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, iibb_pct, dbcr_pct))
+                tree.insert(
+                    '',
+                    'end',
+                    values=(
+                        cuenta,
+                        nombre,
+                        pct_str(iibb_pct),
+                        pct_str(dbcr_pct),
+                    ),
+                )
 
         poblar_tax_cobros(regs)
 
@@ -1795,8 +1929,10 @@ class App(tk.Tk):
                     originales.append(tup)
             overwrite_records(full_path, originales)
 
-            nonlocal regs
-            regs = [(str(r[0]), float(r[1]), float(r[2])) for r in originales]
+            regs[:] = [
+                (str(r[0]), float(r[1]), float(r[2]))
+                for r in originales
+            ]
             aplicar_filtros_tax_cobros()
 
         boton_elim.config(command=eliminar_tax_cobros)
@@ -1835,8 +1971,20 @@ class App(tk.Tk):
 
             def guardar():
                 try:
-                    regs[idx_reg] = (e_c.get(), float(e_i.get()), float(e_d.get()))
-                    overwrite_records(full_path, regs)
+                    regs[idx_reg] = (
+                        e_c.get(),
+                        float(str(e_i.get()).replace(',', '.')),
+                        float(str(e_d.get()).replace(',', '.')),
+                    )
+                    persist = [
+                        (
+                            r[0],
+                            float(r[1]),
+                            float(r[2]),
+                        )
+                        for r in regs
+                    ]
+                    overwrite_records(full_path, persist)
                     aplicar_filtros_tax_cobros()
                     win.destroy()
                 except ValueError:
@@ -1845,10 +1993,11 @@ class App(tk.Tk):
             ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
 
         boton_edit.config(command=editar_tax_cobros)
+        tree.bind('<Double-1>', lambda e: editar_tax_cobros())
 
         # 12) Formulario “Agregar” (row=4)
         f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=2, column=0, sticky='ew', padx=10, pady=10)
+        f2.grid(row=3, column=0, sticky='ew', padx=10, pady=10)
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
         ttk.Label(f2, text='%IIBB:').grid(row=0, column=2, padx=10)
@@ -1860,30 +2009,223 @@ class App(tk.Tk):
             text='Agregar',
             style='Big.TButton',
             command=lambda: (
-                save_tax_cobros(((e_c.get(), float(e_i.get()), float(e_d.get())),)),
+                save_tax_cobros(((
+                    e_c.get(),
+                    float(str(e_i.get()).replace(',', '.')) / 100.0,
+                    float(str(e_d.get()).replace(',', '.')) / 100.0,
+                ),)),
                 messagebox.showinfo('Éxito', 'Registro Cobros agregado.'),
                 self._show_frame('tax_cobros')
             )
         ).grid(row=1, column=0, columnspan=6, pady=10)
 
     def _build_tax_pagos(self, parent):
-        # 0) Limpiar todo
+        # 0) Limpiar el frame destino
+        for w in parent.winfo_children():
+            w.destroy()
+    
+        ttk.Label(parent, text='Tabla Impositiva - Pagos', style='Title.TLabel').pack(pady=10)
+    
+        full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
+    
+        # 1) Cargar el archivo y normalizar a lista [(cuenta, dbcr_decimal), …]
+        data = load_tax_pagos()                                   # {cuenta: 0.006, …}
+        regs = [(str(num), float(rate)) for num, rate in data.items()]
+    
+        # ---------- UI ----------
+        cont = ttk.Frame(parent, padding=5)
+        cont.pack(expand=True, fill='both')
+    
+        cols = ['Cuenta', 'Nombre', '%DByCR Banc.']
+        cont.grid_columnconfigure(0, weight=1)
+    
+        table_canvas = tk.Canvas(cont, highlightthickness=0)
+        table_canvas.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+    
+        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        hsb.grid(row=1, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+    
+        table = ttk.Frame(table_canvas)
+        table_canvas.create_window((0, 0), window=table, anchor='nw')
+        table.bind('<Configure>',
+                   lambda e: table_canvas.configure(scrollregion=table_canvas.bbox('all')))
+    
+        # Filtros
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+    
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
+    
+        filtro_entrys = {}
+        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
+        ent_cuenta.grid(row=0, column=0, padx=1, pady=(0, 5), sticky='ew')
+        filtro_frame.grid_columnconfigure(0, weight=1)
+        filtro_entrys[0] = ent_cuenta
+    
+        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
+        ent_nombre.grid(row=0, column=1, padx=1, pady=(0, 5), sticky='ew')
+        filtro_frame.grid_columnconfigure(1, weight=1)
+        filtro_entrys[1] = ent_nombre
+    
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+    
+        # Tabla principal
+        vsb = ttk.Scrollbar(table, orient='vertical')
+    
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            table_canvas.xview_moveto(args[0])
+            hsb.set(*args)
+    
+        tree = ttk.Treeview(table, columns=cols, show='headings',
+                            yscrollcommand=vsb.set, xscrollcommand=_tree_xview)
+        vsb.config(command=tree.yview)
+    
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+            table_canvas.xview(*args)
+    
+        hsb.config(command=_scroll_x)
+    
+        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
+        vsb.grid(row=1, column=len(cols), sticky='ns')
+        table.grid_rowconfigure(1, weight=1)
+    
+        for c in cols:
+            tree.heading(c, text=c, anchor='center')
+            tree.column(c, width=140, anchor='center', stretch=True)
+    
+        # ---------- helpers ----------
+        def poblar(lista):
+            tree.delete(*tree.get_children())
+            for cuenta, pct_dbcr in lista:
+                nombre = self.plan.get(cuenta, '')
+                tree.insert('', 'end', values=(cuenta, nombre, pct_str(pct_dbcr)))
+    
+        poblar(regs)
+    
+        def aplicar_filtros(_=None):
+            filtros = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
+            filtrados = []
+            for cuenta, pct_dbcr in regs:
+                nombre = self.plan.get(cuenta, '')
+                if filtros[0] and filtros[0] not in cuenta.lower():
+                    continue
+                if filtros[1] and filtros[1] not in nombre.lower():
+                    continue
+                filtrados.append((cuenta, pct_dbcr))
+            poblar(filtrados)
+    
+        ent_cuenta.bind('<KeyRelease>', aplicar_filtros)
+        ent_nombre.bind('<KeyRelease>', aplicar_filtros)
+    
+        # ---------- botones ----------
+        btn_frame = ttk.Frame(cont)
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(10, 0))
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',   style='Big.TButton')
+        btn_del.grid(row=0, column=0, padx=5)
+        btn_edit.grid(row=0, column=1, padx=5)
+    
+        def eliminar():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            cuenta_sel = tree.item(sel[0], 'values')[0]
+            if not messagebox.askyesno('Confirmar',
+                                       f'¿Eliminar impuestos para cuenta {cuenta_sel}?'):
+                return
+            regs[:] = [(c, r) for c, r in regs if c != cuenta_sel]
+            overwrite_records(full_path, regs)          # se graban como decimales
+            aplicar_filtros()
+    
+        btn_del.configure(command=eliminar)
+    
+        def editar():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.')
+                return
+            cuenta_sel, _, pct_texto = tree.item(sel[0], 'values')
+            idx = next(i for i, (c, _) in enumerate(regs) if c == cuenta_sel)
+    
+            win = tk.Toplevel(self)
+            win.title('Editar impuesto')
+            ttk.Label(win, text='Cuenta:',          style='Field.TLabel').grid(row=0, column=0, sticky='e')
+            ttk.Label(win, text='%DByCR Banc.:',    style='Field.TLabel').grid(row=1, column=0, sticky='e')
+    
+            e_c = ttk.Entry(win, style='Field.TEntry'); e_c.grid(row=0, column=1, padx=5, pady=2)
+            e_d = ttk.Entry(win, style='Field.TEntry'); e_d.grid(row=1, column=1, padx=5, pady=2)
+            e_c.insert(0, cuenta_sel)
+            e_d.insert(0, pct_texto)
+    
+            def guardar():
+                try:
+                    cuenta = e_c.get().strip()
+                    pct_ui = float(str(e_d.get()).replace(',', '.'))
+                    pct_dec = pct_ui / 100.0                     # ⇒ decimal
+                    regs[idx] = (cuenta, pct_dec)
+                    overwrite_records(full_path, regs)
+                    aplicar_filtros()
+                    win.destroy()
+                except ValueError:
+                    messagebox.showerror('Error', 'Valor inválido.')
+    
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
+               .grid(row=2, column=0, columnspan=2, pady=10)
+    
+        btn_edit.configure(command=editar)
+    
+        # ---------- alta rápida ----------
+        frm_add = ttk.Frame(cont, padding=5)
+        frm_add.grid(row=3, column=0, sticky='ew', pady=(10, 0))
+    
+        ttk.Label(frm_add, text='Cuenta:',        style='Field.TLabel').grid(row=0, column=0)
+        ttk.Label(frm_add, text='%DByCR Banc.:',  style='Field.TLabel').grid(row=0, column=2)
+    
+        add_c = ttk.Entry(frm_add, style='Field.TEntry'); add_c.grid(row=0, column=1, padx=(5, 20))
+        add_d = ttk.Entry(frm_add, style='Field.TEntry'); add_d.grid(row=0, column=3, padx=(5, 0))
+    
+        def agregar():
+            try:
+                cuenta = add_c.get().strip()
+                pct_ui = float(str(add_d.get()).replace(',', '.'))
+                pct_dec = pct_ui / 100.0
+                regs.append((cuenta, pct_dec))
+                save_tax_pagos(((cuenta, pct_dec),))
+                poblar(regs)
+                add_c.delete(0, 'end'); add_d.delete(0, 'end')
+            except ValueError:
+                messagebox.showerror('Error', 'Valor inválido.')
+    
+        ttk.Button(frm_add, text='Agregar', command=agregar, style='Big.TButton')\
+           .grid(row=1, column=0, columnspan=4, pady=(10, 0))
+
+
+    def _build_expensas(self, parent):
         for w in parent.winfo_children():
             w.destroy()
 
-        lbl_title = ttk.Label(parent, text='Tabla Impositiva - Pagos', style='Title.TLabel')
-        lbl_title.pack(pady=10)
+        ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
 
-        full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-        tbl = load_tax_pagos()  # dict { 'cuenta': pct_dbcr }
-        regs = [(num, tbl[num]) for num in tbl]
-        # regs = [(cuenta, pct_dbcr), ...]
+        full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
+        regs = storage.load_expensas()
+        # [(cuenta, fecha, monto), ...]
+
+        if not regs:
+            ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
+            return
+
+        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
 
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
-
-        cols = ['Cuenta', 'Nombre', '%DByCR Banc.']
-
         cont.grid_columnconfigure(0, weight=1)
 
         table_canvas = tk.Canvas(cont, highlightthickness=0)
@@ -1908,17 +2250,11 @@ class App(tk.Tk):
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
 
         filtro_entrys = {}
-        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
-        ent_cuenta.grid(row=0, column=0, padx=1, pady=(0,5), sticky='ew')
-        filtro_frame.grid_columnconfigure(0, weight=1)
-        filtro_entrys[0] = ent_cuenta
-
-        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
-        ent_nombre.grid(row=0, column=1, padx=1, pady=(0,5), sticky='ew')
-        filtro_frame.grid_columnconfigure(1, weight=1)
-        filtro_entrys[1] = ent_nombre
-
-        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=(0,5))
+        for idx, col in enumerate(cols):
+            ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
+            ent.grid(row=0, column=idx, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(idx, weight=1)
+            filtro_entrys[idx] = ent
 
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
@@ -1949,145 +2285,127 @@ class App(tk.Tk):
 
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
-
         table.grid_rowconfigure(1, weight=1)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=140, anchor='center')
+            tree.column(c, width=130, anchor='center')
 
-        # 3) Poblamos inicialmente
-        def poblar_tax_pagos(lista):
+        def poblar_exp(lista):
             for item in tree.get_children():
                 tree.delete(item)
-            for row in lista:
-                cuenta, pct_dbcr = row
+            for cuenta, fecha, monto in lista:
                 nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, pct_dbcr))
+                tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
 
-        poblar_tax_pagos(regs)
+        poblar_exp(regs)
 
-        # 4) Función de filtrado (solo “Cuenta” y “Nombre”)
-        def aplicar_filtros_tax_pagos(event=None):
-            filtros = {idx: ent.get().strip() for idx, ent in filtro_entrys.items()}
+        def aplicar_filtros_exp(event=None):
+            filtros = {i: e.get() for i, e in filtro_entrys.items()}
             filtrados = []
-
             for row in regs:
-                cuenta, pct_dbcr = row
+                cuenta, fecha, monto = row
+                nombre = self.plan.get(cuenta, '')
+                cells = [cuenta, nombre, fecha, str(monto)]
                 match = True
-
-                # Filtro "Cuenta" (col_idx = 0)
-                txt0 = filtros.get(0, "")
-                if txt0:
-                    if txt0.lower() not in cuenta.lower():
+                for idx, txt in filtros.items():
+                    if not txt.strip():
+                        continue
+                    if txt.lower() not in str(cells[idx]).lower():
                         match = False
-
-                # Filtro "Nombre" (col_idx = 1)
-                txt1 = filtros.get(1, "")
-                if match and txt1:
-                    nombre = self.plan.get(cuenta, '')
-                    if txt1.lower() not in nombre.lower():
-                        match = False
-
+                        break
                 if match:
                     filtrados.append(row)
+            poblar_exp(filtrados)
 
-            poblar_tax_pagos(filtrados)
+        for ent in filtro_entrys.values():
+            ent.bind('<KeyRelease>', aplicar_filtros_exp)
 
-        ent_cuenta.bind('<KeyRelease>', aplicar_filtros_tax_pagos)
-        ent_nombre.bind('<KeyRelease>', aplicar_filtros_tax_pagos)
-
-        # 5) Botón “Eliminar seleccionado” (row=3)
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(10,0))
-        boton_elim = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
-        boton_elim.grid(row=0, column=0, padx=5)
-        boton_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
-        boton_edit.grid(row=0, column=1, padx=5)
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(5,0))
+        btn_del = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
+        btn_del.grid(row=0, column=0, padx=5)
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
+        btn_edit.grid(row=0, column=1, padx=5)
 
-        def eliminar_tax_pagos():
+        def eliminar_exp():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
             vals = tree.item(sel[0], 'values')
-            num_cuenta = vals[0]
-            if not messagebox.askyesno('Confirmar', f'¿Eliminar impuestos para cuenta {num_cuenta}?'):
+            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
                 return
+            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
+            d = storage.load_expensas()
+            idx = None
+            for i, r in enumerate(d):
+                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
+                    idx = i
+                    break
+            if idx is not None:
+                d.pop(idx)
+                storage.save_expensas(d)
+            regs[:] = d
+            self._load_data()
+            poblar_exp(regs)
 
-            originales = []
-            with open(full_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    tup = ast.literal_eval(line)
-                    if str(tup[0]) == str(num_cuenta):
-                        continue
-                    originales.append(tup)
-            overwrite_records(full_path, originales)
+        btn_del.config(command=eliminar_exp)
 
-            nonlocal regs
-            regs = [(str(r[0]), float(r[1])) for r in originales]
-            aplicar_filtros_tax_pagos()
-
-        boton_elim.config(command=eliminar_tax_pagos)
-
-        def editar_tax_pagos():
+        def editar_exp():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
             vals = tree.item(sel[0], 'values')
-            num_cuenta = vals[0]
+            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
             idx_reg = None
             for i, r in enumerate(regs):
-                if str(r[0]) == str(num_cuenta):
+                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
                     idx_reg = i
                     break
             if idx_reg is None:
                 return
 
+            orig_vals = list(regs[idx_reg])
+
             win = tk.Toplevel(self)
-            win.title('Editar impuesto')
-            ttk.Label(win, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
-            e_c = ttk.Entry(win, style='Field.TEntry')
-            e_c.grid(row=0, column=1, padx=5, pady=2)
-            e_c.insert(0, vals[0])
-            ttk.Label(win, text='%DByCR Banc.:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
-            e_d = ttk.Entry(win, style='Field.TEntry')
-            e_d.grid(row=1, column=1, padx=5, pady=2)
-            e_d.insert(0, vals[2])
+            win.title('Editar expensa')
+            entries = []
+            for i, col in enumerate(['Cuenta', 'Fecha', 'Monto']):
+                ttk.Label(win, text=col+':', style='Field.TLabel').grid(row=i, column=0, sticky='e', padx=5, pady=2)
+                e = ttk.Entry(win, style='Field.TEntry')
+                e.grid(row=i, column=1, padx=5, pady=2)
+                e.insert(0, orig_vals[i])
+                entries.append(e)
 
             def guardar():
+                cuenta_n = entries[0].get().strip()
+                fecha_n = entries[1].get().strip()
                 try:
-                    regs[idx_reg] = (e_c.get(), float(e_d.get()))
-                    overwrite_records(full_path, regs)
-                    aplicar_filtros_tax_pagos()
-                    win.destroy()
+                    monto_n = float(entries[2].get())
                 except ValueError:
-                    messagebox.showerror('Error', 'Valores inválidos')
+                    messagebox.showerror('Error', 'Monto inválido')
+                    return
+                d = storage.load_expensas()
+                # encontrar registro nuevamente
+                idx = None
+                for i, r in enumerate(d):
+                    if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
+                        idx = i
+                        break
+                if idx is not None:
+                    d[idx] = (cuenta_n, fecha_n, monto_n)
+                    storage.save_expensas(d)
+                regs[:] = d
+                self._load_data()
+                poblar_exp(regs)
+                win.destroy()
 
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
 
-        boton_edit.config(command=editar_tax_pagos)
-
-        # 6) Formulario para agregar nuevo registro (row=4)
-        f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=2, column=0, sticky='ew', pady=(10,0))
-        ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
-        e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1, padx=(5,20))
-        ttk.Label(f2, text='%DByCR Banc.:').grid(row=0, column=2)
-        e_d = ttk.Entry(f2, style='Field.TEntry'); e_d.grid(row=0, column=3, padx=(5,0))
-        ttk.Button(
-            f2,
-            text='Agregar',
-            style='Big.TButton',
-            command=lambda: (
-                save_tax_pagos(((e_c.get(), float(e_d.get())),)),
-                messagebox.showinfo('Éxito', 'Registro Pagos agregado.'),
-                self._show_frame('tax_pagos')
-            )
-        ).grid(row=1, column=0, columnspan=4, pady=(10,0))
+        btn_edit.config(command=editar_exp)
+        tree.bind('<Double-1>', lambda e: editar_exp())
 
 if __name__ == '__main__':
     App().mainloop()
