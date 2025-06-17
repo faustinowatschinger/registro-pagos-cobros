@@ -51,11 +51,17 @@ def importar_liquidaciones_desde_ods(ruta_ods):
     if pd is not None:
         df = pd.read_excel(ruta_ods, engine="odf", dtype=str)
         filas = [
-            tuple("" if val is None or (isinstance(val, float) and pd.isna(val)) else str(val).strip() for val in row)
+            tuple(
+                "" if val is None or (isinstance(val, float) and pd.isna(val)) else str(val).strip()
+                for val in row
+            )
             for row in df.itertuples(index=False, name=None)
         ]
     else:
         filas = _leer_ods_sin_pandas(ruta_ods)
+
+    # Importar solo hasta la fila 342 (inclusive)
+    filas = filas[:342]
 
     with open(path_txt, "w", encoding="utf-8") as f_txt:
         importados = 0
