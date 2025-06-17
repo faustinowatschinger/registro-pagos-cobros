@@ -69,5 +69,19 @@ def importar_liquidaciones_desde_ods(ruta_ods):
 
 
 if __name__ == "__main__":
-    ruta_ods = os.path.join(os.path.dirname(__file__), "LIQUIDACIONES ENERGIA.ods")
+    import sys
+
+    if len(sys.argv) > 1:
+        ruta_ods = sys.argv[1]
+    else:
+        ruta_ods = os.path.join(os.path.dirname(__file__), "LIQUIDACIONES ENERGIA.ods")
+
+    if not os.path.exists(ruta_ods):
+        print(
+            "No se encontró el archivo ODS:\n"
+            f"  {ruta_ods}\n"
+            "Indique la ruta como argumento al ejecutar el script."
+        )
+        sys.exit(1)
+
     importar_liquidaciones_desde_ods(ruta_ods)
