@@ -2214,6 +2214,23 @@ class App(tk.Tk):
 
         ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
 
+        default_amt = storage.load_expensa_default()
+        top = ttk.Frame(parent)
+        top.pack(pady=(0, 10))
+        ttk.Label(top, text='Monto por defecto:', style='Field.TLabel').grid(row=0, column=0, padx=5)
+        entry_def = ttk.Entry(top, style='Field.TEntry', width=12)
+        entry_def.grid(row=0, column=1, padx=5)
+        entry_def.insert(0, str(default_amt))
+        def _save_def():
+            try:
+                val = float(entry_def.get())
+            except ValueError:
+                messagebox.showerror('Error', 'Monto inválido')
+                return
+            storage.save_expensa_default(val)
+            messagebox.showinfo('Listo', 'Monto por defecto actualizado')
+        ttk.Button(top, text='Guardar', command=_save_def, style='Big.TButton').grid(row=0, column=2, padx=5)
+
         full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
         regs = storage.load_expensas()
         # [(cuenta, fecha, monto), ...]
