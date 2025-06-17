@@ -177,6 +177,7 @@ def save_tax_pagos(tax_tuple):
 # --- Expensas -------------------------------------------------
 
 EXPENSAS_FILE = 'expensas.txt'
+EXPENSA_DEFAULT_FILE = 'expensa_default.txt'
 
 def load_expensas():
     """Return list of tuples [(cuenta, fecha, monto), ...]"""
@@ -207,6 +208,23 @@ def save_expensas(exp_list):
             f.write(repr((cuenta, fecha, monto)) + "\n")
     return True
 
+def load_expensa_default():
+    """Return the default monthly amount for new expensa entries."""
+    path = os.path.join(ensure_data_directory(), EXPENSA_DEFAULT_FILE)
+    if os.path.exists(path):
+        try:
+            return float(open(path, 'r', encoding='utf-8').read().strip())
+        except Exception:
+            pass
+    return 33900.0
+
+
+def save_expensa_default(value):
+    path = os.path.join(ensure_data_directory(), EXPENSA_DEFAULT_FILE)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(str(float(value)))
+    return True
+
 def update_expensas(plan_dict):
     """Add a new positive entry each month for every expensa account."""
     exps = load_expensas()
@@ -220,12 +238,13 @@ def update_expensas(plan_dict):
         mes = fecha[:7]
         last_months[c] = max(mes, last_months.get(c, '0000-00'))
 
+    default_amt = load_expensa_default()
     for acc in plan_dict:
         if not str(acc).startswith('11-21-'):
             continue
         last = last_months.get(acc)
         if last != cur_month:
-            exps.append((str(acc), cur_month, 33900.0))
+            exps.append((str(acc), cur_month, default_amt))
             updated = True
     if updated:
         save_expensas(exps)

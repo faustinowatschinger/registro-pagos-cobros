@@ -95,3 +95,5 @@ if __name__ == "__main__":
             "No se encontró el archivo ODS:\n"
             f"  {ruta_ods}\n"
             "Indique la ruta como argumento al ejecutar el script.")
+    else:
+        importar_liquidaciones_desde_ods(ruta_ods)
