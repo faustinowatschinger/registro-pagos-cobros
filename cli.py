@@ -3,6 +3,7 @@ import ast
 import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
+import typing
 
 from model import cobro, pago, cliente
 import storage
@@ -79,8 +80,13 @@ def overwrite_records(path, lista_registros):
             f.write(repr(r) + "\n")
 
 
-def center_in_canvas(canvas: tk.Canvas, widget: tk.Widget, win_id: int) -> None:
-    """Center *widget* horizontally inside *canvas* for the given window id."""
+def center_in_canvas(
+    canvas: tk.Canvas,
+    widget: tk.Widget,
+    win_id: int,
+    hsb: typing.Optional[ttk.Scrollbar] = None,
+) -> None:
+    """Center *widget* horizontally and toggle *hsb* visibility as needed."""
 
     def _recenter(_=None):
         canvas_width = canvas.winfo_width()
@@ -88,6 +94,11 @@ def center_in_canvas(canvas: tk.Canvas, widget: tk.Widget, win_id: int) -> None:
         x = max((canvas_width - widget_width) // 2, 0)
         canvas.coords(win_id, x, 0)
         canvas.configure(scrollregion=canvas.bbox('all'))
+        if hsb is not None:
+            if widget_width > canvas_width:
+                hsb.grid()
+            else:
+                hsb.grid_remove()
 
     widget.bind('<Configure>', _recenter)
     canvas.bind('<Configure>', _recenter)
@@ -284,11 +295,13 @@ class App(tk.Tk):
         table_canvas.configure(xscrollcommand=hsb.set)
 
         table = ttk.Frame(table_canvas)
-        table_canvas.create_window((0, 0), window=table, anchor='nw')
-        table.bind(
-            '<Configure>',
-            lambda e: table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-        )
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
+
+        def _tbl_conf(_=None):
+            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
+
+        table.bind('<Configure>', _tbl_conf)
+        center_in_canvas(table_canvas, table, table_win, hsb)
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(headers), sticky='ew')
@@ -1609,7 +1622,7 @@ class App(tk.Tk):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win)
+        center_in_canvas(table_canvas, table, table_win, hsb)
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
@@ -1811,7 +1824,7 @@ class App(tk.Tk):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win)
+        center_in_canvas(table_canvas, table, table_win, hsb)
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
@@ -2072,7 +2085,7 @@ class App(tk.Tk):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win)
+        center_in_canvas(table_canvas, table, table_win, hsb)
     
         # Filtros
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
@@ -2282,7 +2295,7 @@ class App(tk.Tk):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win)
+        center_in_canvas(table_canvas, table, table_win, hsb)
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
