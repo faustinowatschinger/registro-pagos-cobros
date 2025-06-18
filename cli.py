@@ -1153,7 +1153,7 @@ class App(tk.Tk):
                             f'Nombre de cuenta {code} no coincide con la liquidación.'
                         )
                         return
-                    storage.append_liquidacion(nombre_plan, code.strip(), fec_imp, imp)
+                    storage.append_liquidacion(code.strip(), nombre_plan, fec_imp, imp)
         # Calcular IVA sobre el total de imputaciones
         try:
             base_sin_iva = total_imputaciones / (1 + pct_iva) if total_imputaciones else 0.0
@@ -2282,8 +2282,16 @@ class App(tk.Tk):
             except ValueError:
                 messagebox.showerror('Error', 'Valor inválido.')
     
-        ttk.Button(frm_add, text='Agregar', command=agregar, style='Big.TButton')\
-        cols = ['Nombre', 'Parcela', 'Fecha', 'Monto']
+        # --- dentro de _build_tax_pagos() ---
+        ttk.Button(
+            frm_add,
+            text='Agregar',
+            command=agregar,
+            style='Big.TButton'
+        ).grid(row=1, column=0, columnspan=4, pady=(10, 0))
+
+# ❷  BORRA la línea ‘cols = ...’ que quedó pegada aquí
+
 
 
     def _build_expensas(self, parent):
@@ -2555,12 +2563,31 @@ class App(tk.Tk):
             tree.heading(c, text=c, anchor='center')
             tree.column(c, width=130, anchor='center')
 
+        def nombre_a_cuenta(nom):
+            """Busca en self.plan la cuenta 11-26-xxx cuyo nombre == nom."""
+            for cod, nombre in self.plan.items():
+                if cod.startswith('11-26') and nombre == nom:
+                    return cod
+            return '—'         # placeholder si no se encuentra
+    
         def poblar(lista):
-            for item in tree.get_children():
-                tree.delete(item)
-            for nombre, parcela, fecha, monto in lista:
-                tree.insert('', 'end', values=(nombre, parcela, fecha, monto))
-
+            tree.delete(*tree.get_children())
+        
+            for a, b, c, d in lista:
+                # a) caso nuevo: ya viene (cuenta, nombre, fecha, monto)
+                if str(a).startswith('11-26'):
+                    cuenta, nombre, fecha, monto = a, b, c, d
+                else:
+                    # b) caso viejo: (nombre, parcela/cuenta, fecha, monto)
+                    nombre, posible_cuenta, fecha, monto = a, b, c, d
+                    # ← a partir de aquí usa **posible_cuenta**
+                    if str(posible_cuenta).startswith('11-26'):
+                        cuenta = posible_cuenta
+                    else:
+                        cuenta = nombre_a_cuenta(nombre)
+        
+                tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
+                
         poblar(regs)
 
         def aplicar_filtros(event=None):
