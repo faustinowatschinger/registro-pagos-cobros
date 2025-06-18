@@ -116,10 +116,7 @@ def center_in_canvas(
 
 def filter_rows(lista_registros, filtros):
     """
-    Dada la lista completa de registros (lista de tuplas) y un diccionario `filtros`
-    donde la clave es el índice de columna (0, 1, 2, ...) y el valor es la cadena
-    de filtro (se busca substring, case-insensitive),
-    retorna solo aquellas filas que coincidan en todas las columnas filtradas.
+    Devuelve las filas que cumplan todos los filtros (substring, case-insensitive).
     """
     resultado = []
     for row in lista_registros:
@@ -131,13 +128,11 @@ def filter_rows(lista_registros, filtros):
             if texto.lower() not in celda.lower():
                 match = False
                 break
-            'plan', 'tax_cobros', 'tax_pagos', 'expensas', 'liquidaciones'
-        self._build_liquidaciones(self.frames['liquidaciones'])
-            ('Liquidaciones', 'liquidaciones'),
-        elif name == 'liquidaciones':
-            self._build_liquidaciones(self.frames[name])
+        # ← NO debe haber más código “extraño” aquí
+        if match:
             resultado.append(row)
     return resultado
+
 
 
 class App(tk.Tk):
@@ -162,23 +157,21 @@ class App(tk.Tk):
         for name in [
             'cobro', 'pago', 'cliente',
             'lst_cobros', 'lst_pagos', 'lst_clientes',
-            'plan', 'tax_cobros', 'tax_pagos', 'expensas'
+            'plan', 'tax_cobros', 'tax_pagos',
+            'expensas', 'liquidaciones'      # ← nuevo
         ]:
             self.frames[name] = ttk.Frame(self.content)
-
-        # 3) Relleno (pueblo) cada frame con su contenido, SIN empaquetarlo aquí
+        
+        # poblar cada frame (sin empaquetar todavía)
         self._build_cobro(self.frames['cobro'])
         self._build_pago(self.frames['pago'])
-        # Contenedor principal donde irán los distintos "frames"
-            ('Ver Cobros', 'lst_cobros'),
-            ('Ver Pagos', 'lst_pagos'),
-            ('Ver Clientes', 'lst_clientes'),
-            ('Imp. Pagos', 'tax_pagos'),
-            ('Expensas', 'expensas'),
+        self._build_cliente(self.frames['cliente'])
         self._build_plan(self.frames['plan'])
         self._build_tax_cobros(self.frames['tax_cobros'])
         self._build_tax_pagos(self.frames['tax_pagos'])
         self._build_expensas(self.frames['expensas'])
+        self._build_liquidaciones(self.frames['liquidaciones'])   # ← nuevo
+
 
         # 4) Al arrancar, muestro sólo la vista "cobro"
         self._show_frame('cobro')
@@ -207,13 +200,19 @@ class App(tk.Tk):
 
         # Botones de navegación
         pages = [
-            ('Cobro', 'cobro'), ('Pago', 'pago'), ('Cliente', 'cliente'),
-            ('Ver Cobros', 'lst_cobros'), ('Ver Pagos', 'lst_pagos'), ('Ver Clientes', 'lst_clientes'),
-            ('Plan Ctas', 'plan'),
-            ('Imp. Cobros', 'tax_cobros'),
-            ('Imp. Pagos',  'tax_pagos'),
-            ('Expensas',   'expensas'),
+            ('Cobro',        'cobro'),
+            ('Pago',         'pago'),
+            ('Cliente',      'cliente'),
+            ('Ver Cobros',   'lst_cobros'),
+            ('Ver Pagos',    'lst_pagos'),
+            ('Ver Clientes', 'lst_clientes'),
+            ('Plan Ctas',    'plan'),
+            ('Imp. Cobros',  'tax_cobros'),
+            ('Imp. Pagos',   'tax_pagos'),
+            ('Expensas',     'expensas'),
+            ('Liquidaciones','liquidaciones'),   # ← nuevo
         ]
+
         for txt, name in pages:
             ttk.Button(
                 self.nav,
@@ -244,6 +243,9 @@ class App(tk.Tk):
             self._build_plan(self.frames[name])
         elif name == 'expensas':
             self._build_expensas(self.frames[name])
+        elif name == 'liquidaciones':
+            self._build_liquidaciones(self.frames[name])
+
 
         # 3) Finalmente, empaco (pack) solo el frame que quiero mostrar
         frame = self.frames[name]
@@ -1142,7 +1144,7 @@ class App(tk.Tk):
         montoA_val = float(montoA or 0)
         montoB_val = float(montoB or 0)
 
-            for code, concept, fec_imp, imp in imputaciones:
+        for code, concept, fec_imp, imp in imputaciones:
                 if str(code).startswith('11-26-'):
                     nombre_plan = self.plan.get(code.strip(), '')
                     if nombre_plan != concept.strip():
