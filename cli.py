@@ -86,29 +86,31 @@ def center_in_canvas(
     win_id: int,
     hsb: typing.Optional[ttk.Scrollbar] = None,
 ) -> None:
-    """Center *widget* horizontally and toggle *hsb* visibility as needed."""
+    """Make *widget* fill the canvas width and toggle *hsb* visibility."""
 
-    def _recenter(_=None):
+    def _resize(_=None) -> None:
+        canvas.update_idletasks()
         canvas_width = canvas.winfo_width()
-        widget_width = widget.winfo_width()
-        x = max((canvas_width - widget_width) // 2, 0)
-        canvas.coords(win_id, x, 0)
-        canvas.configure(scrollregion=canvas.bbox('all'))
-        canvas.xview_moveto(0)  # reset scroll offset
+        widget_width = widget.winfo_reqwidth()
+        width = max(canvas_width, widget_width)
+        canvas.itemconfigure(win_id, width=width)
+        canvas.coords(win_id, 0, 0)
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        canvas.xview_moveto(0)
         if hsb is not None:
             if widget_width > canvas_width:
                 hsb.grid()
             else:
                 hsb.grid_remove()
 
-    def force_recenter() -> None:
+    def force_resize() -> None:
         canvas.update_idletasks()
-        _recenter()
+        _resize()
 
-    widget.bind('<Configure>', _recenter)
-    canvas.bind('<Configure>', _recenter)
-    canvas._center_cb = force_recenter
-    force_recenter()
+    widget.bind("<Configure>", _resize)
+    canvas.bind("<Configure>", _resize)
+    canvas._center_cb = force_resize
+    force_resize()
 
 def filter_rows(lista_registros, filtros):
     """
