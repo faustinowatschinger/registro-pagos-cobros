@@ -169,10 +169,12 @@ class App(tk.Tk):
         # 3) Relleno (pueblo) cada frame con su contenido, SIN empaquetarlo aquí
         self._build_cobro(self.frames['cobro'])
         self._build_pago(self.frames['pago'])
-        self._build_cliente(self.frames['cliente'])
-        self._build_list(self.frames['lst_cobros'],   'cobros.txt')
-        self._build_list(self.frames['lst_pagos'],    'pagos.txt')
-        self._build_list(self.frames['lst_clientes'], 'clientes.txt')
+        # Contenedor principal donde irán los distintos "frames"
+            ('Ver Cobros', 'lst_cobros'),
+            ('Ver Pagos', 'lst_pagos'),
+            ('Ver Clientes', 'lst_clientes'),
+            ('Imp. Pagos', 'tax_pagos'),
+            ('Expensas', 'expensas'),
         self._build_plan(self.frames['plan'])
         self._build_tax_cobros(self.frames['tax_cobros'])
         self._build_tax_pagos(self.frames['tax_pagos'])
