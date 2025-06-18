@@ -94,6 +94,7 @@ def center_in_canvas(
         x = max((canvas_width - widget_width) // 2, 0)
         canvas.coords(win_id, x, 0)
         canvas.configure(scrollregion=canvas.bbox('all'))
+        canvas.xview_moveto(0)  # reset scroll offset
         if hsb is not None:
             if widget_width > canvas_width:
                 hsb.grid()
