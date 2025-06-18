@@ -309,12 +309,12 @@ def load_liquidaciones():
             if tup and 'CLIENTE' in tup[0].upper():
                 continue
 
-            if len(tup) >= 6:
+            if len(tup) >= 5:
                 nombre = tup[0] or tup[1]
                 parcela = tup[1] if tup[0] else tup[2]
                 mes = tup[2] if tup[0] else tup[3]
                 anio = tup[3] if tup[0] else tup[4]
-                monto = tup[-2]
+                monto = tup[4] if tup[0] else tup[5] if len(tup) > 5 else ''
             elif len(tup) >= 4:
                 # Previously stored format (cuenta, nombre, fecha, monto)
                 nombre = tup[1]
