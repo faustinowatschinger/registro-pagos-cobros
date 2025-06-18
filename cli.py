@@ -1153,7 +1153,7 @@ class App(tk.Tk):
                             f'Nombre de cuenta {code} no coincide con la liquidación.'
                         )
                         return
-                    storage.append_liquidacion(code.strip(), nombre_plan, fec_imp, imp)
+                    storage.append_liquidacion(nombre_plan, code.strip(), fec_imp, imp)
         # Calcular IVA sobre el total de imputaciones
         try:
             base_sin_iva = total_imputaciones / (1 + pct_iva) if total_imputaciones else 0.0
@@ -2283,7 +2283,7 @@ class App(tk.Tk):
                 messagebox.showerror('Error', 'Valor inválido.')
     
         ttk.Button(frm_add, text='Agregar', command=agregar, style='Big.TButton')\
-           .grid(row=1, column=0, columnspan=4, pady=(10, 0))
+        cols = ['Nombre', 'Parcela', 'Fecha', 'Monto']
 
 
     def _build_expensas(self, parent):
@@ -2558,8 +2558,8 @@ class App(tk.Tk):
         def poblar(lista):
             for item in tree.get_children():
                 tree.delete(item)
-            for cuenta, nombre, fecha, monto in lista:
-                tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
+            for nombre, parcela, fecha, monto in lista:
+                tree.insert('', 'end', values=(nombre, parcela, fecha, monto))
 
         poblar(regs)
 
@@ -2597,11 +2597,11 @@ class App(tk.Tk):
             vals = tree.item(sel[0], 'values')
             if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
                 return
-            cuenta_v, nombre_v, fecha_v, monto_v = vals
+            nombre_v, parcela_v, fecha_v, monto_v = vals
             d = storage.load_liquidaciones()
             idx = None
             for i, r in enumerate(d):
-                if (str(r[0]) == str(cuenta_v) and str(r[1]) == str(nombre_v) and
+                if (str(r[0]) == str(nombre_v) and str(r[1]) == str(parcela_v) and
                         str(r[2]) == str(fecha_v) and float(r[3]) == float(monto_v)):
                     idx = i
                     break
@@ -2619,10 +2619,10 @@ class App(tk.Tk):
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
             vals = tree.item(sel[0], 'values')
-            cuenta_v, nombre_v, fecha_v, monto_v = vals
+            nombre_v, parcela_v, fecha_v, monto_v = vals
             idx_reg = None
             for i, r in enumerate(regs):
-                if (str(r[0]) == str(cuenta_v) and str(r[1]) == str(nombre_v) and
+                if (str(r[0]) == str(nombre_v) and str(r[1]) == str(parcela_v) and
                         str(r[2]) == str(fecha_v) and float(r[3]) == float(monto_v)):
                     idx_reg = i
                     break
@@ -2642,8 +2642,8 @@ class App(tk.Tk):
                 entries.append(e)
 
             def guardar():
-                cuenta_n = entries[0].get().strip()
-                nombre_n = entries[1].get().strip()
+                nombre_n = entries[0].get().strip()
+                parcela_n = entries[1].get().strip()
                 fecha_n = entries[2].get().strip()
                 try:
                     monto_n = float(entries[3].get())
@@ -2653,12 +2653,12 @@ class App(tk.Tk):
                 d = storage.load_liquidaciones()
                 idx = None
                 for i, r in enumerate(d):
-                    if (str(r[0]) == str(cuenta_v) and str(r[1]) == str(nombre_v) and
+                    if (str(r[0]) == str(nombre_v) and str(r[1]) == str(parcela_v) and
                             str(r[2]) == str(fecha_v) and float(r[3]) == float(monto_v)):
                         idx = i
                         break
                 if idx is not None:
-                    d[idx] = (cuenta_n, nombre_n, fecha_n, monto_n)
+                    d[idx] = (nombre_n, parcela_n, fecha_n, monto_n)
                     storage.save_liquidaciones(d)
                 regs[:] = d
                 poblar(regs)

@@ -282,7 +282,7 @@ LIQUIDACIONES_FILE = 'liquidaciones.txt'
 LIQUIDACIONES_FALLBACK = 'liquidaciones_energia.txt'
 
 def load_liquidaciones():
-    """Return list of tuples ``[(cuenta, nombre, fecha, monto), ...]``."""
+    """Return list of tuples ``[(nombre, parcela, fecha, monto), ...]``."""
     data_dir = ensure_data_directory()
     path = os.path.join(data_dir, LIQUIDACIONES_FILE)
     if not os.path.exists(path):
@@ -294,31 +294,60 @@ def load_liquidaciones():
     records = []
     if os.path.exists(path):
         for line in open(path, 'r', encoding='utf-8'):
-            if not line.strip():
+            line = line.strip()
+            if not line:
                 continue
             try:
                 tup = ast.literal_eval(line)
             except Exception:
                 continue
-            if isinstance(tup, tuple) and len(tup) >= 4:
-                cuenta, nombre, fecha, monto = tup[:4]
+            if not isinstance(tup, tuple):
+                continue
+            tup = [str(v).strip() for v in tup]
+
+            # Skip header rows
+            if tup and 'CLIENTE' in tup[0].upper():
+                continue
+
+            if len(tup) >= 6:
+                nombre = tup[0] or tup[1]
+                parcela = tup[1] if tup[0] else tup[2]
+                mes = tup[2] if tup[0] else tup[3]
+                anio = tup[3] if tup[0] else tup[4]
+                monto = tup[-2]
+            elif len(tup) >= 4:
+                # Previously stored format (cuenta, nombre, fecha, monto)
+                nombre = tup[1]
+                parcela = tup[0]
+                fecha = tup[2]
                 try:
-                    monto = float(monto)
+                    monto = float(tup[3])
                 except Exception:
                     continue
-                records.append((str(cuenta), str(nombre), str(fecha), monto))
+                records.append((nombre, parcela, str(fecha), monto))
+                continue
+            else:
+                continue
+
+            mes = mes.zfill(2)
+            fecha = f"{anio}-{mes}"
+            try:
+                monto = float(str(monto).replace(',', '.'))
+            except Exception:
+                continue
+            records.append((nombre, parcela, fecha, monto))
     return records
 
 def save_liquidaciones(liq_list):
     path = os.path.join(ensure_data_directory(), LIQUIDACIONES_FILE)
     with open(path, 'w', encoding='utf-8') as f:
         for rec in liq_list:
-            c, n, fe, mo = rec
-            f.write(repr((c, n, fe, float(mo))) + '\n')
+            n, p, fe, mo = rec
+            f.write(repr((n, p, fe, float(mo))) + '\n')
     return True
 
-def append_liquidacion(cuenta, nombre, fecha, monto):
+def append_liquidacion(nombre, parcela, fecha, monto):
     liqs = load_liquidaciones()
-    liqs.append((str(cuenta), str(nombre), str(fecha), float(monto)))
+    liqs.append((str(nombre), str(parcela), str(fecha), float(monto)))
     save_liquidaciones(liqs)
     return True
