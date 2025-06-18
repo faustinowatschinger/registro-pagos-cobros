@@ -90,7 +90,7 @@ def center_in_canvas(
 
     def _recenter(_=None):
         canvas_width = canvas.winfo_width()
-        widget_width = widget.winfo_reqwidth()
+        widget_width = widget.winfo_width()
         x = max((canvas_width - widget_width) // 2, 0)
         canvas.coords(win_id, x, 0)
         canvas.configure(scrollregion=canvas.bbox('all'))
@@ -100,9 +100,14 @@ def center_in_canvas(
             else:
                 hsb.grid_remove()
 
+    def force_recenter() -> None:
+        canvas.update_idletasks()
+        _recenter()
+
     widget.bind('<Configure>', _recenter)
     canvas.bind('<Configure>', _recenter)
-    _recenter()
+    canvas._center_cb = force_recenter
+    force_recenter()
 
 def filter_rows(lista_registros, filtros):
     """
@@ -230,7 +235,18 @@ class App(tk.Tk):
             self._build_expensas(self.frames[name])
 
         # 3) Finalmente, empaco (pack) solo el frame que quiero mostrar
-        self.frames[name].pack(expand=True, fill='both')
+        frame = self.frames[name]
+        frame.pack(expand=True, fill='both')
+        self.update_idletasks()
+        self._call_recenters(frame)
+
+    def _call_recenters(self, widget):
+        """Recursively trigger centering callbacks on canvases inside *widget*."""
+
+        for child in widget.winfo_children():
+            if hasattr(child, "_center_cb"):
+                child._center_cb()
+            self._call_recenters(child)
 
 
     # ---------------------------
@@ -1664,8 +1680,8 @@ class App(tk.Tk):
 
         hsb.config(command=_scroll_x)
 
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew', pady=(5,0))
-        vsb.grid(row=1, column=len(cols), sticky='ns', pady=(5,0))
+        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
+        vsb.grid(row=1, column=len(cols), sticky='ns')
 
         table.grid_rowconfigure(1, weight=1)
 
@@ -1834,17 +1850,17 @@ class App(tk.Tk):
 
         filtro_entrys = {}
         ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
-        ent_cuenta.grid(row=0, column=0, padx=1, pady=(0,5), sticky='ew')
+        ent_cuenta.grid(row=0, column=0, padx=1, pady=0, sticky='ew')
         filtro_frame.grid_columnconfigure(0, weight=1)
         filtro_entrys[0] = ent_cuenta
 
         ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
-        ent_nombre.grid(row=0, column=1, padx=1, pady=(0,5), sticky='ew')
+        ent_nombre.grid(row=0, column=1, padx=1, pady=0, sticky='ew')
         filtro_frame.grid_columnconfigure(1, weight=1)
         filtro_entrys[1] = ent_nombre
 
-        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=(0,5))
-        ttk.Label(filtro_frame, text='').grid(row=0, column=3, padx=1, pady=(0,5))
+        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=0)
+        ttk.Label(filtro_frame, text='').grid(row=0, column=3, padx=1, pady=0)
 
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
@@ -2096,12 +2112,12 @@ class App(tk.Tk):
     
         filtro_entrys = {}
         ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
-        ent_cuenta.grid(row=0, column=0, padx=1, pady=(0, 5), sticky='ew')
+        ent_cuenta.grid(row=0, column=0, padx=1, pady=0, sticky='ew')
         filtro_frame.grid_columnconfigure(0, weight=1)
         filtro_entrys[0] = ent_cuenta
     
         ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
-        ent_nombre.grid(row=0, column=1, padx=1, pady=(0, 5), sticky='ew')
+        ent_nombre.grid(row=0, column=1, padx=1, pady=0, sticky='ew')
         filtro_frame.grid_columnconfigure(1, weight=1)
         filtro_entrys[1] = ent_nombre
     
