@@ -2669,12 +2669,6 @@ class App(tk.Tk):
         btn_edit.config(command=editar)
         tree.bind('<Double-1>', lambda e: editar())
 
-        ttk.Label(frm_def, text='Monto por defecto:', style='Field.TLabel')\
-               .grid(row=0, column=0, padx=5)
-    
-        entry_def = ttk.Entry(frm_def, style='Field.TEntry', width=12)
-        entry_def.grid(row=0, column=1, padx=5)
-        entry_def.insert(0, str(default_amt))
     
         def _save_def():
             try:
@@ -2684,9 +2678,7 @@ class App(tk.Tk):
                 return
             storage.save_expensa_default(val)
             messagebox.showinfo('Listo', 'Monto por defecto actualizado')
-    
-        ttk.Button(frm_def, text='Guardar', command=_save_def, style='Big.TButton')\
-               .grid(row=0, column=2, padx=5)
+
 
 
 if __name__ == '__main__':
