@@ -275,3 +275,36 @@ def apply_payment_expensa(cuenta, amount, fecha):
     mes = _month_from(fecha)
     exps.append((str(cuenta), mes, -abs(float(amount))))
     save_expensas(exps)
+
+# --- Liquidaciones ------------------------------------------------
+
+LIQUIDACIONES_FILE = 'liquidaciones.txt'
+
+def load_liquidaciones():
+    """Return list of tuples [(cuenta, nombre, fecha, monto), ...]"""
+    path = os.path.join(ensure_data_directory(), LIQUIDACIONES_FILE)
+    data = []
+    if os.path.exists(path):
+        for line in open(path, 'r', encoding='utf-8'):
+            if not line.strip():
+                continue
+            try:
+                cuenta, nombre, fecha, monto = ast.literal_eval(line)
+                data.append((str(cuenta), str(nombre), str(fecha), float(monto)))
+            except Exception:
+                continue
+    return data
+
+def save_liquidaciones(liq_list):
+    path = os.path.join(ensure_data_directory(), LIQUIDACIONES_FILE)
+    with open(path, 'w', encoding='utf-8') as f:
+        for rec in liq_list:
+            c, n, fe, mo = rec
+            f.write(repr((c, n, fe, float(mo))) + '\n')
+    return True
+
+def append_liquidacion(cuenta, nombre, fecha, monto):
+    liqs = load_liquidaciones()
+    liqs.append((str(cuenta), str(nombre), str(fecha), float(monto)))
+    save_liquidaciones(liqs)
+    return True
