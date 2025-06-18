@@ -2478,7 +2478,6 @@ class App(tk.Tk):
 
         ttk.Label(parent, text='Liquidaciones', style='Title.TLabel').pack(pady=10)
 
-        full_path = os.path.join(ensure_data_directory(), 'liquidaciones.txt')
         regs = storage.load_liquidaciones()
 
         if not regs:
