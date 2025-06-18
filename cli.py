@@ -33,6 +33,8 @@ def build_styles(root):
     style.configure('Field.TEntry',  font=('Segoe UI', 12))
     style.configure('Title.TLabel',  font=('Segoe UI', 16, 'bold'))
     style.configure('Header.TLabel', font=('Segoe UI', 14))
+    style.configure('Treeview',          font=('Segoe UI', 14), rowheight=28)
+    style.configure('Treeview.Heading',  font=('Segoe UI', 15, 'bold'))
     return style
 
 class PlaceholderEntry(ttk.Entry):
@@ -368,7 +370,12 @@ class App(tk.Tk):
 
         for h in headers:
             tree.heading(h, text=h)
-            tree.column(h, width=120, anchor='center')
+            tree.column(
+                h,
+                anchor='center',
+                stretch=True,       # permite que la columna se ensanche
+                minwidth=120        # ancho mínimo razonable
+            )
 
         # 7) Función para poblar el Treeview
         def poblar_treeview(lista_para_mostrar):
@@ -2263,83 +2270,68 @@ class App(tk.Tk):
 
 
     def _build_expensas(self, parent):
+        # 0) Limpiar el contenido del frame
         for w in parent.winfo_children():
             w.destroy()
-
+    
         ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
-
-        default_amt = storage.load_expensa_default()
-        top = ttk.Frame(parent)
-        top.pack(pady=(0, 10))
-        ttk.Label(top, text='Monto por defecto:', style='Field.TLabel').grid(row=0, column=0, padx=5)
-        entry_def = ttk.Entry(top, style='Field.TEntry', width=12)
-        entry_def.grid(row=0, column=1, padx=5)
-        entry_def.insert(0, str(default_amt))
-        def _save_def():
-            try:
-                val = float(entry_def.get())
-            except ValueError:
-                messagebox.showerror('Error', 'Monto inválido')
-                return
-            storage.save_expensa_default(val)
-            messagebox.showinfo('Listo', 'Monto por defecto actualizado')
-        ttk.Button(top, text='Guardar', command=_save_def, style='Big.TButton').grid(row=0, column=2, padx=5)
-
+    
+        # --- cargar datos ---
         full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
-        regs = storage.load_expensas()
-        # [(cuenta, fecha, monto), ...]
-
+        regs = storage.load_expensas()           # [(cuenta, fecha, monto), …]
+        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
+    
         if not regs:
             ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
             return
-
-        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
-
+    
+        # --- contenedor principal ---
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
         cont.grid_columnconfigure(0, weight=1)
-
+    
+        # ---------------- Tabla ----------------
         table_canvas = tk.Canvas(cont, highlightthickness=0)
         table_canvas.grid(row=0, column=0, sticky='nsew')
         cont.grid_rowconfigure(0, weight=1)
-
+    
         hsb = ttk.Scrollbar(cont, orient='horizontal')
         hsb.grid(row=1, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
-
+    
         table = ttk.Frame(table_canvas)
         table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
+    
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-
         table.bind('<Configure>', _tbl_conf)
         center_in_canvas(table_canvas, table, table_win, hsb)
-
+    
+        # --- filtros ---
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-
+    
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
-
+    
         filtro_entrys = {}
         for idx, col in enumerate(cols):
             ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
             ent.grid(row=0, column=idx, padx=1, sticky='ew')
             filtro_frame.grid_columnconfigure(idx, weight=1)
             filtro_entrys[idx] = ent
-
+    
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
-
+    
+        # --- Treeview ---
         vsb = ttk.Scrollbar(table, orient='vertical')
-        filtro_canvas.configure(xscrollcommand=hsb.set)
-
+    
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
             table_canvas.xview_moveto(args[0])
             hsb.set(*args)
-
+    
         tree = ttk.Treeview(
             table,
             columns=cols,
@@ -2348,137 +2340,140 @@ class App(tk.Tk):
             xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-
+    
         def _scroll_x(*args):
             tree.xview(*args)
             filtro_canvas.xview(*args)
             table_canvas.xview(*args)
-
         hsb.config(command=_scroll_x)
-
+    
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
         table.grid_rowconfigure(1, weight=1)
-
+    
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=130, anchor='center')
-
+            tree.column(c, anchor='center', stretch=True, minwidth=130)
+    
+        # --- helpers de datos ---
         def poblar_exp(lista):
-            for item in tree.get_children():
-                tree.delete(item)
+            tree.delete(*tree.get_children())
             for cuenta, fecha, monto in lista:
                 nombre = self.plan.get(cuenta, '')
                 tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
-
+    
         poblar_exp(regs)
-
-        def aplicar_filtros_exp(event=None):
-            filtros = {i: e.get() for i, e in filtro_entrys.items()}
+    
+        def aplicar_filtros_exp(_=None):
+            filtros = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
             filtrados = []
-            for row in regs:
-                cuenta, fecha, monto = row
+            for cuenta, fecha, monto in regs:
                 nombre = self.plan.get(cuenta, '')
-                cells = [cuenta, nombre, fecha, str(monto)]
-                match = True
-                for idx, txt in filtros.items():
-                    if not txt.strip():
-                        continue
-                    if txt.lower() not in str(cells[idx]).lower():
-                        match = False
-                        break
-                if match:
-                    filtrados.append(row)
+                celdas = [cuenta, nombre, fecha, str(monto)]
+                if all(not f or f in c.lower() for f, c in zip(filtros.values(), celdas)):
+                    filtrados.append((cuenta, fecha, monto))
             poblar_exp(filtrados)
-
+    
         for ent in filtro_entrys.values():
             ent.bind('<KeyRelease>', aplicar_filtros_exp)
-
+    
+        # ---------------- Botones ----------------
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(5,0))
-        btn_del = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(5, 0))
+    
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',   style='Big.TButton')
         btn_del.grid(row=0, column=0, padx=5)
-        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
         btn_edit.grid(row=0, column=1, padx=5)
-
+    
         def eliminar_exp():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
-            vals = tree.item(sel[0], 'values')
+            cuenta_v, _, fecha_v, monto_v = tree.item(sel[0], 'values')
             if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
                 return
-            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
-            d = storage.load_expensas()
-            idx = None
-            for i, r in enumerate(d):
-                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
-                    idx = i
-                    break
-            if idx is not None:
-                d.pop(idx)
-                storage.save_expensas(d)
-            regs[:] = d
+            datos = storage.load_expensas()
+            datos = [r for r in datos
+                     if not (str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v)
+                             and float(r[2]) == float(monto_v))]
+            storage.save_expensas(datos)
+            regs[:] = datos
             self._load_data()
             poblar_exp(regs)
-
-        btn_del.config(command=eliminar_exp)
-
+    
+        btn_del.configure(command=eliminar_exp)
+    
         def editar_exp():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
-            vals = tree.item(sel[0], 'values')
-            cuenta_v, fecha_v, monto_v = vals[0], vals[2], float(vals[3])
-            idx_reg = None
-            for i, r in enumerate(regs):
-                if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
-                    idx_reg = i
-                    break
-            if idx_reg is None:
-                return
-
-            orig_vals = list(regs[idx_reg])
-
-            win = tk.Toplevel(self)
-            win.title('Editar expensa')
+            orig_vals = tree.item(sel[0], 'values')          # (cuenta, nombre, fecha, monto)
+            cuenta_v, fecha_v, monto_v = orig_vals[0], orig_vals[2], float(orig_vals[3])
+    
+            win = tk.Toplevel(self); win.title('Editar expensa')
+            labels = ['Cuenta', 'Fecha', 'Monto']
             entries = []
-            for i, col in enumerate(['Cuenta', 'Fecha', 'Monto']):
-                ttk.Label(win, text=col+':', style='Field.TLabel').grid(row=i, column=0, sticky='e', padx=5, pady=2)
+            for i, lab in enumerate(labels):
+                ttk.Label(win, text=f'{lab}:', style='Field.TLabel')\
+                   .grid(row=i, column=0, sticky='e', padx=5, pady=2)
                 e = ttk.Entry(win, style='Field.TEntry')
                 e.grid(row=i, column=1, padx=5, pady=2)
-                e.insert(0, orig_vals[i])
+                e.insert(0, orig_vals[0 if lab == 'Cuenta' else 2 if lab == 'Fecha' else 3])
                 entries.append(e)
-
+    
             def guardar():
-                cuenta_n = entries[0].get().strip()
-                fecha_n = entries[1].get().strip()
                 try:
-                    monto_n = float(entries[2].get())
+                    cuenta_n = entries[0].get().strip()
+                    fecha_n  = entries[1].get().strip()
+                    monto_n  = float(entries[2].get())
                 except ValueError:
                     messagebox.showerror('Error', 'Monto inválido')
                     return
-                d = storage.load_expensas()
-                # encontrar registro nuevamente
-                idx = None
-                for i, r in enumerate(d):
+                datos = storage.load_expensas()
+                for i, r in enumerate(datos):
                     if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
-                        idx = i
+                        datos[i] = (cuenta_n, fecha_n, monto_n)
                         break
-                if idx is not None:
-                    d[idx] = (cuenta_n, fecha_n, monto_n)
-                    storage.save_expensas(d)
-                regs[:] = d
+                storage.save_expensas(datos)
+                regs[:] = datos
                 self._load_data()
                 poblar_exp(regs)
                 win.destroy()
+    
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
+               .grid(row=3, column=0, columnspan=2, pady=10)
+    
+        btn_edit.configure(command=editar_exp)
+        tree.bind('<Double-1>', lambda _=None: editar_exp())
+    
+        # ---------------- Monto por defecto (fila 3) ----------------
+        default_amt = storage.load_expensa_default()
+    
+        frm_def = ttk.Frame(cont)
+        frm_def.grid(row=3, column=0, sticky='w', pady=(10, 0))
+    
+        ttk.Label(frm_def, text='Monto por defecto:', style='Field.TLabel')\
+               .grid(row=0, column=0, padx=5)
+    
+        entry_def = ttk.Entry(frm_def, style='Field.TEntry', width=12)
+        entry_def.grid(row=0, column=1, padx=5)
+        entry_def.insert(0, str(default_amt))
+    
+        def _save_def():
+            try:
+                val = float(entry_def.get())
+            except ValueError:
+                messagebox.showerror('Error', 'Monto inválido')
+                return
+            storage.save_expensa_default(val)
+            messagebox.showinfo('Listo', 'Monto por defecto actualizado')
+    
+        ttk.Button(frm_def, text='Guardar', command=_save_def, style='Big.TButton')\
+               .grid(row=0, column=2, padx=5)
 
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
-
-        btn_edit.config(command=editar_exp)
-        tree.bind('<Double-1>', lambda e: editar_exp())
 
 if __name__ == '__main__':
     App().mainloop()
