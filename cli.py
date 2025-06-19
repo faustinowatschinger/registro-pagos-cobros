@@ -55,15 +55,8 @@ class PlaceholderEntry(ttk.Entry):
     def _show(self, event=None):
         if not self.get():
             self._ph_visible = True
-            self.insert(0, self.placeholder)
-            self.configure(foreground="gray")
-
-    def _clear(self, event=None):
-        if self._ph_visible:
-    vsb: typing.Optional[ttk.Scrollbar] = None,
-    tree: typing.Optional[ttk.Treeview] = None,
-    min_col_w: int = 80,
-    """Center *widget* in *canvas* toggling scrollbars as needed."""
+def center_in_canvas(canvas, widget, win_id,
+                     hsb=None, vsb=None, tree=None, min_col_w=80):
 
         if tree is not None:
             cols = tree["columns"]
