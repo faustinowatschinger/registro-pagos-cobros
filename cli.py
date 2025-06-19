@@ -60,7 +60,26 @@ class PlaceholderEntry(ttk.Entry):
 
     def _clear(self, event=None):
         if self._ph_visible:
-            self.delete(0, "end")
+    *,
+    vsb: typing.Optional[ttk.Scrollbar] = None,
+    tree: typing.Optional[ttk.Treeview] = None,
+    min_col_w: int = 80,
+    """Center *widget* in *canvas* toggling scrollbars as needed."""
+
+        if tree is not None:
+            cols = tree["columns"]
+            if cols:
+                col_w = max(min_col_w, canvas_width // len(cols))
+                for c in cols:
+                    tree.column(c, width=col_w)
+
+        if vsb is not None:
+            need_v = canvas.bbox("all")[3] > canvas.winfo_height()
+            if need_v:
+                vsb.grid()
+            else:
+                vsb.grid_remove()
+
             self.configure(foreground="black")
             self._ph_visible = False
 
@@ -301,7 +320,16 @@ class App(tk.Tk):
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
 
-        # 3) Leer registros desde disco
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
+
         full_path = os.path.join(ensure_data_directory(), filename)
         registros = read_records(full_path)
         if not registros:
@@ -1631,7 +1659,16 @@ class App(tk.Tk):
 
     def _save_cliente(self, nombre, dni, direccion, t1, t2, email, p1, p2, p3, sup, obs):
         c = cliente(
-            get_next_clients_id(),
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
+
             nombre, dni, direccion,
             t1, t2, email,
             p1, p2, p3,
@@ -1833,7 +1870,6 @@ class App(tk.Tk):
 
         # Formulario para agregar nuevas cuentas (row=5)
         frm2 = ttk.Frame(cont, padding=5)
-        frm2.grid(row=3, column=0, sticky='ew', pady=(10,0))
         ttk.Label(frm2, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0)
         cde = ttk.Entry(frm2, style='Field.TEntry')
         cde.grid(row=0, column=1, padx=(5,20))
@@ -1890,6 +1926,16 @@ class App(tk.Tk):
         center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 ) 
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
+
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
 
         filtro_frame = ttk.Frame(filtro_canvas)
@@ -2094,7 +2140,16 @@ class App(tk.Tk):
         f2.grid(row=3, column=0, sticky='ew', padx=10, pady=10)
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
-        ttk.Label(f2, text='%IIBB:').grid(row=0, column=2, padx=10)
+
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
         e_i = ttk.Entry(f2, style='Field.TEntry'); e_i.grid(row=0, column=3)
         ttk.Label(f2, text='%DByCR:').grid(row=0, column=4, padx=10)
         e_d = ttk.Entry(f2, style='Field.TEntry'); e_d.grid(row=0, column=5)
@@ -2304,7 +2359,17 @@ class App(tk.Tk):
     
         # --- dentro de _build_tax_pagos() ---
         ttk.Button(
-            frm_add,
+
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
+
             text='Agregar',
             command=agregar,
             style='Big.TButton'
@@ -2503,7 +2568,16 @@ class App(tk.Tk):
     def _build_liquidaciones(self, parent):
         # ───────── limpiar frame ─────────
         for w in parent.winfo_children():
-            w.destroy()
+        center_in_canvas(
+            table_canvas,
+            table,
+            table_win,
+            hsb,
+            vsb=vsb,
+            tree=tree,
+            min_col_w=110,
+        )
+
     
         ttk.Label(parent, text='Liquidaciones', style='Title.TLabel').pack(pady=10)
     
