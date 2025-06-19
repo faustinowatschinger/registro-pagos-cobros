@@ -60,7 +60,6 @@ class PlaceholderEntry(ttk.Entry):
 
     def _clear(self, event=None):
         if self._ph_visible:
-    *,
     vsb: typing.Optional[ttk.Scrollbar] = None,
     tree: typing.Optional[ttk.Treeview] = None,
     min_col_w: int = 80,
