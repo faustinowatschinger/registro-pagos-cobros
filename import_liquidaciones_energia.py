@@ -68,7 +68,7 @@ def importar_liquidaciones_desde_ods(ruta_ods):
         filas = _descartar_columnas_vacias(filas)
     else:
         filas = _leer_ods_sin_pandas(ruta_ods)
-        filas = filas[:342]
+        filas = filas[:417]
         filas = _descartar_columnas_vacias(filas)
 
     with open(path_txt, "w", encoding="utf-8") as f_txt:
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         ruta_ods = sys.argv[1]
     else:
-        ruta_ods = os.path.join(os.path.dirname(__file__), "LIQUIDACIONES ENERGIA.ods")
+        ruta_ods = os.path.join(os.path.dirname(__file__), "liquidaciones.ods")
 
     if not os.path.exists(ruta_ods):
         print(
