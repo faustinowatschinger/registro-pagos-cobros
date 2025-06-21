@@ -3,6 +3,7 @@ import ast
 import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
+from typing import Optional
 
 from model import cobro, pago, cliente
 import storage
@@ -83,13 +84,15 @@ def overwrite_records(path, lista_registros):
             f.write(repr(r) + "\n")
 
 
-def center_in_canvas(canvas: tk.Canvas,
-                     widget: tk.Widget,
-                     win_id: int,
-                     hsb: typing.Optional[ttk.Scrollbar] = None,
-                     vsb: typing.Optional[ttk.Scrollbar] = None,
-                     tree: typing.Optional[ttk.Treeview] = None,
-                     min_col_w: int = 120) -> None:
+def center_in_canvas(
+    canvas: tk.Canvas,
+    widget: tk.Widget,
+    win_id: int,
+    hsb: Optional[ttk.Scrollbar] = None,
+    vsb: Optional[ttk.Scrollbar] = None,
+    tree: Optional[ttk.Treeview] = None,
+    min_col_w: int = 120,
+) -> None:
     """
     • Hace que *widget* cubra TODO el ancho del *canvas*
     • Muestra / oculta barras de scroll según necesidad
