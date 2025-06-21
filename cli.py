@@ -158,17 +158,32 @@ def filter_rows(lista_registros, filtros):
     return resultado
 
 
-def make_scrollable(parent: tk.Widget) -> tuple[tk.Canvas, ttk.Frame, int, ttk.Scrollbar]:
-    """Return a canvas with a vertically scrollable frame inside."""
+def make_scrollable(parent):
     canvas = tk.Canvas(parent, highlightthickness=0)
-    canvas.pack(side="left", expand=True, fill="both")
-    vsb = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-    vsb.pack(side="right", fill="y")
+    vsb    = ttk.Scrollbar(parent, orient='vertical', command=canvas.yview)
+
+    canvas.grid(row=0, column=0, sticky='nsew')
+    vsb.grid  (row=0, column=1, sticky='ns')
+    parent.grid_rowconfigure   (0, weight=1)
+    parent.grid_columnconfigure(0, weight=1)
+
+    cont = ttk.Frame(canvas)
+    cont_win = canvas.create_window((0, 0), window=cont, anchor='nw')
     canvas.configure(yscrollcommand=vsb.set)
-    frame = ttk.Frame(canvas)
-    win_id = canvas.create_window((0, 0), window=frame, anchor="nw")
-    center_in_canvas(canvas, frame, win_id, vsb=vsb)
-    return canvas, frame, win_id, vsb
+
+    # ⬇⬇  AJUSTE CLAVE  ⬇⬇
+    def _resize(_=None):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        # ← Fuerza a que ‘cont’ use TODO el ancho visible del Canvas
+        canvas.itemconfigure(cont_win, width=canvas.winfo_width())
+
+    cont.bind   ("<Configure>", _resize)
+    canvas.bind ("<Configure>", _resize)   # ← agrega este bind
+    canvas._center_cb = _resize
+
+    return canvas, cont, cont_win, vsb
+
+
 
 
 
@@ -1556,193 +1571,194 @@ class App(tk.Tk):
 
 
 
+    # ---------------------------------------------------------------------
+    #  Construye la vista de “Registro de Cliente”
+    # ---------------------------------------------------------------------
     def _build_cliente(self, parent):
+        # 0) Limpiar cualquier contenido previo
         for w in parent.winfo_children():
             w.destroy()
 
+        # 1) Lienzo desplazable (si usas muchos campos)
         canvas, cont, cont_win, vsb = make_scrollable(parent)
         cont.configure(padding=20, relief='groove')
 
-        ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel').pack(pady=(0,20))
+        # 2) Título
+        ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel')\
+            .pack(pady=(0, 20))
 
-        header = ttk.Frame(cont, padding=(0,10))
+        # 3) Encabezado con datos fijos de la empresa
+        header = ttk.Frame(cont, padding=(0, 10))
         header.pack(fill='x')
-        left = ttk.Frame(header)
-        left.pack(side='left', padx=5)
-        ttk.Label(left, text='BIOCULTIVOS SAS', style='Title.TLabel').pack(anchor='w')
-        ttk.Label(left, text='CUIT 30-71841359-8', style='Header.TLabel').pack(anchor='w')
-        right = ttk.Frame(header)
-        right.pack(side='right', padx=5)
-        ttk.Label(right, text='Condominio El Michay', style='Header.TLabel').pack(anchor='e')
-        ttk.Label(right, text='Chacra 032-E-007-01C', style='Header.TLabel').pack(anchor='e')
-        ttk.Label(right, text='General Fernández Oro (R.N.)', style='Header.TLabel').pack(anchor='e')
+        left = ttk.Frame(header);  left.pack(side='left',  padx=5)
+        right = ttk.Frame(header); right.pack(side='right', padx=5)
 
+        ttk.Label(left,  text='BIOCULTIVOS SAS',       style='Title.TLabel').pack(anchor='w')
+        ttk.Label(left,  text='CUIT 30-71841359-8',    style='Header.TLabel').pack(anchor='w')
+        ttk.Label(right, text='Condominio El Michay',  style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='Chacra 032-E-007-01C',  style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='Gral. Fernández Oro (R.N.)', style='Header.TLabel').pack(anchor='e')
+
+        # 4) Formulario de campos (centrado)
         fields = ttk.Frame(cont, padding=5)
-        fields.pack(fill='x', pady=(0,10))
+        fields.pack(pady=(0,10))
+        fields.pack_propagate(False)
+        fields.place(relx=0.5, anchor='n')  # centra en el eje horizontal
+        fields.pack(pady=(0, 10), anchor='center')          # << centrado
+        for col in range(4):                                # columnas flex
+            fields.grid_columnconfigure(col, weight=1)
 
+        # fila 0 ─ nombre
         ttk.Label(fields, text='Nombre y Apellido:', style='Field.TLabel')\
-            .grid(row=0, column=0, sticky='e', padx=5, pady=5)
-        nombre_entry = ttk.Entry(fields, style='Field.TEntry', width=45)
+            .grid(row=0, column=0, padx=5, pady=5)
+        nombre_entry = ttk.Entry(fields, style='Field.TEntry', width=45, justify='center')
         nombre_entry.grid(row=0, column=1, columnspan=3, pady=5)
 
+        # fila 1 ─ DNI + dirección
         ttk.Label(fields, text='DNI:', style='Field.TLabel')\
-            .grid(row=1, column=0, sticky='e', padx=5, pady=5)
-        dni_entry = ttk.Entry(fields, style='Field.TEntry', width=20)
+            .grid(row=1, column=0, padx=5, pady=5)
+        dni_entry = ttk.Entry(fields, style='Field.TEntry', width=20, justify='center')
         dni_entry.grid(row=1, column=1, pady=5)
 
         ttk.Label(fields, text='Dirección:', style='Field.TLabel')\
-            .grid(row=1, column=2, sticky='e', padx=5, pady=5)
-        direccion_entry = ttk.Entry(fields, style='Field.TEntry', width=30)
+            .grid(row=1, column=2, padx=5, pady=5)
+        direccion_entry = ttk.Entry(fields, style='Field.TEntry', width=30, justify='center')
         direccion_entry.grid(row=1, column=3, pady=5)
 
+        # fila 2 ─ email
         ttk.Label(fields, text='Email:', style='Field.TLabel')\
-            .grid(row=2, column=0, sticky='e', padx=5, pady=5)
-        email_entry = ttk.Entry(fields, style='Field.TEntry', width=25)
-        email_entry.grid(row=2, column=1, columnspan=3, pady=5, sticky='w')
+            .grid(row=2, column=0, padx=5, pady=5)
+        email_entry = ttk.Entry(fields, style='Field.TEntry', width=30, justify='center')
+        email_entry.grid(row=2, column=1, columnspan=3, pady=5)
 
+        # fila 3 ─ teléfonos
         ttk.Label(fields, text='Teléfono 1:', style='Field.TLabel')\
-            .grid(row=3, column=0, sticky='e', padx=5, pady=5)
-        tel1_entry = ttk.Entry(fields, style='Field.TEntry', width=15)
+            .grid(row=3, column=0, padx=5, pady=5)
+        tel1_entry = ttk.Entry(fields, style='Field.TEntry', width=15, justify='center')
         tel1_entry.grid(row=3, column=1, pady=5)
 
         ttk.Label(fields, text='Teléfono 2:', style='Field.TLabel')\
-            .grid(row=3, column=2, sticky='e', padx=5, pady=5)
-        tel2_entry = ttk.Entry(fields, style='Field.TEntry', width=15)
+            .grid(row=3, column=2, padx=5, pady=5)
+        tel2_entry = ttk.Entry(fields, style='Field.TEntry', width=15, justify='center')
         tel2_entry.grid(row=3, column=3, pady=5)
 
+        # fila 4 ─ parcelas
         ttk.Label(fields, text='Parcela 1:', style='Field.TLabel')\
-            .grid(row=4, column=0, sticky='e', padx=5, pady=5)
-        parcela1_entry = ttk.Entry(fields, style='Field.TEntry', width=10)
+            .grid(row=4, column=0, padx=5, pady=5)
+        parcela1_entry = ttk.Entry(fields, style='Field.TEntry', width=10, justify='center')
         parcela1_entry.grid(row=4, column=1, pady=5)
 
         ttk.Label(fields, text='Parcela 2:', style='Field.TLabel')\
-            .grid(row=4, column=2, sticky='e', padx=5, pady=5)
-        parcela2_entry = ttk.Entry(fields, style='Field.TEntry', width=10)
+            .grid(row=4, column=2, padx=5, pady=5)
+        parcela2_entry = ttk.Entry(fields, style='Field.TEntry', width=10, justify='center')
         parcela2_entry.grid(row=4, column=3, pady=5)
 
+        # fila 5 ─ parcela 3 + superficie
         ttk.Label(fields, text='Parcela 3:', style='Field.TLabel')\
-            .grid(row=5, column=0, sticky='e', padx=5, pady=5)
-        parcela3_entry = ttk.Entry(fields, style='Field.TEntry', width=10)
+            .grid(row=5, column=0, padx=5, pady=5)
+        parcela3_entry = ttk.Entry(fields, style='Field.TEntry', width=10, justify='center')
         parcela3_entry.grid(row=5, column=1, pady=5)
 
         ttk.Label(fields, text='Superficie:', style='Field.TLabel')\
-            .grid(row=5, column=2, sticky='e', padx=5, pady=5)
-        superficie_entry = ttk.Entry(fields, style='Field.TEntry', width=10)
+            .grid(row=5, column=2, padx=5, pady=5)
+        superficie_entry = ttk.Entry(fields, style='Field.TEntry', width=10, justify='center')
         superficie_entry.grid(row=5, column=3, pady=5)
 
+        # fila 6 ─ observación (celda grande)
         ttk.Label(fields, text='Observación:', style='Field.TLabel')\
-            .grid(row=6, column=0, sticky='ne', padx=5, pady=(10,5))
+            .grid(row=6, column=0, padx=5, pady=(10,5))
         observacion_entry = ttk.Entry(fields, style='Field.TEntry', width=50)
-        observacion_entry.grid(row=6, column=1, columnspan=3, pady=(10,5), sticky='w')
+        observacion_entry.grid(row=6, column=1, columnspan=3, pady=(10,5))
 
-        ttk.Button(cont, text='Guardar Cliente', style='Big.TButton',
-                   command=lambda: (
-                       self._save_cliente(
-                           nombre_entry.get(),
-                           dni_entry.get(),
-                           direccion_entry.get(),
-                           tel1_entry.get(),
-                           tel2_entry.get(),
-                           email_entry.get(),
-                           parcela1_entry.get(),
-                           parcela2_entry.get(),
-                           parcela3_entry.get(),
-                           superficie_entry.get(),
-                           observacion_entry.get()
-                       )
-                   )).pack(pady=(20,0))
+        # 5) Botón guardar, también centrado
+        ttk.Button(
+            cont, text='Guardar Cliente', style='Big.TButton',
+            command=lambda: self._save_cliente(
+                nombre_entry.get(), dni_entry.get(), direccion_entry.get(),
+                tel1_entry.get(),   tel2_entry.get(), email_entry.get(),
+                parcela1_entry.get(), parcela2_entry.get(), parcela3_entry.get(),
+                superficie_entry.get(), observacion_entry.get()
+            )
+        ).pack(pady=(20, 0), anchor='center')
 
+        # 6) ajustar scroll-region
+        canvas._center_cb()  # type: ignore[attr-defined]
 
-    def _save_cliente(self, nombre, dni, direccion, t1, t2, email, p1, p2, p3, sup, obs):
-        cli_rec = cliente(
-            get_next_clients_id(),
-            nombre,
-            dni,
-            direccion,
-            t1,
-            t2,
-            email,
-            p1,
-            p2,
-            p3,
-            sup,
-            obs,
-        )
-        if save_clients((cli_rec,)):
-            messagebox.showinfo('Éxito', 'Cliente registrado.')
-        else:
-            messagebox.showerror('Error', 'No se pudo guardar el cliente.')
-        self._load_data()
-        self._show_frame('lst_clientes')
 
 
     def _build_plan(self, parent):
-        # Limpiar todo
+        # 0) Limpiar contenido previo
         for w in parent.winfo_children():
             w.destroy()
-
+    
+        # 1) Contenedor raíz
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
-
-        # — TÍTULO (row=0) —
-        lbl_title = ttk.Label(cont, text='Plan de Cuentas', style='Title.TLabel')
-        lbl_title.grid(row=0, column=0, columnspan=2, pady=(0,10))
-
-        # Leo todas las cuentas
-        full_path = os.path.join(ensure_data_directory(), 'plan_cuentas.txt')
-        regs = load_plan_cuentas()  # [(numCuenta, nombre), ...]
-
-        if not regs:
-            lbl_empty = ttk.Label(cont, text='No hay cuentas.', style='Field.TLabel')
-            lbl_empty.grid(row=1, column=0, columnspan=2, pady=20)
-            return
-
-        # Columnas: Num cuenta, Nombre
-        cols = ['Num cuenta', 'Nombre']
-
-        # PREPARAMOS GRID COLUMNAS
         cont.grid_columnconfigure(0, weight=1)
-
-        # Frame desplazable horizontalmente
+    
+        # 2) Título
+        ttk.Label(cont, text='Plan de Cuentas', style='Title.TLabel')\
+           .grid(row=0, column=0, pady=(0, 10))
+    
+        # 3) Datos
+        full_path = os.path.join(ensure_data_directory(), 'plan_cuentas.txt')
+        regs = load_plan_cuentas()
+        if not regs:
+            ttk.Label(cont, text='No hay cuentas.', style='Field.TLabel')\
+               .grid(row=1, column=0, pady=20)
+            return
+    
+        cols = ['Num cuenta', 'Nombre']
+    
+        # 4-A) Canvas
         table_canvas = tk.Canvas(cont, highlightthickness=0)
-        table_canvas.grid(row=1, column=0, sticky='nsew', columnspan=len(cols))
+        table_canvas.grid(row=1, column=0, sticky='nsew')
         cont.grid_rowconfigure(1, weight=1)
-
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+    
+        # 4-B) Scrollbar horizontal
+        hsb = ttk.Scrollbar(cont, orient='horizontal', command=table_canvas.xview)
         hsb.grid(row=2, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
-
+    
+        # 5) Frame interno
         table = ttk.Frame(table_canvas)
         table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
+    
+        #  ⬅ NUEVO: que la columna 0 del frame interno crezca
+        table.grid_columnconfigure(0, weight=1)
+    
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-
+            table_canvas.itemconfigure(table_win, width=table_canvas.winfo_width())
+    
         table.bind('<Configure>', _tbl_conf)
-
+        table_canvas.bind('<Configure>', _tbl_conf)
+    
+        # ---------------- Filtros ----------------
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-
+    
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
-
+    
         filtro_entrys = {}
-        for col_idx, col_name in enumerate(cols):
+        for idx, col_name in enumerate(cols):
             ent = PlaceholderEntry(filtro_frame, placeholder=col_name, style='Field.TEntry')
-            ent.grid(row=0, column=col_idx, padx=1, sticky='ew')
-            filtro_frame.grid_columnconfigure(col_idx, weight=1)
-            filtro_entrys[col_idx] = ent
-
+            ent.grid(row=0, column=idx, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(idx, weight=1)
+            filtro_entrys[idx] = ent
+    
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
-
+    
+        # ---------------- Treeview ----------------
         vsb = ttk.Scrollbar(table, orient='vertical')
-        filtro_canvas.configure(xscrollcommand=hsb.set)
-
+    
         def _tree_xview(*args):
             filtro_canvas.xview_moveto(args[0])
             table_canvas.xview_moveto(args[0])
             hsb.set(*args)
-
+    
         tree = ttk.Treeview(
             table,
             columns=cols,
@@ -1751,458 +1767,177 @@ class App(tk.Tk):
             xscrollcommand=_tree_xview
         )
         vsb.config(command=tree.yview)
-
+    
         def _scroll_x(*args):
             tree.xview(*args)
             filtro_canvas.xview(*args)
             table_canvas.xview(*args)
-
         hsb.config(command=_scroll_x)
-
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
-        vsb.grid(row=1, column=len(cols), sticky='ns')
+    
+        tree.grid(row=1, column=0, sticky='nsew')
+        vsb.grid(row=1, column=1, sticky='ns')
         table.grid_rowconfigure(1, weight=1)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-
+    
         for c in cols:
             tree.heading(c, text=c, anchor='center')
             tree.column(c, width=150, anchor='center', stretch=True)
-
-        # Función para llenar el Treeview
-        def poblar_plan(lista):
-            for item in tree.get_children():
-                tree.delete(item)
-            for row in lista:
-                tree.insert('', 'end', values=row)
-
-        poblar_plan(regs)
-
-        # Función de filtrado (se aplica sobre cada columna en su índice correspondiente)
-        def aplicar_filtros_plan(event=None):
-            filtros = {idx: ent.get() for idx, ent in filtro_entrys.items()}
-            filtrados = []
-            for row in regs:
-                match = True
-                for col_idx, txt in filtros.items():
-                    if txt.strip() == "":
-                        continue
-                    if txt.lower() not in str(row[col_idx]).lower():
-                        match = False
-                        break
-                if match:
-                    filtrados.append(row)
-            poblar_plan(filtrados)
-
+    
+        # ---------------- datos / filtros ----------------
+        def poblar(lista):
+            tree.delete(*tree.get_children())
+            for r in lista:
+                tree.insert('', 'end', values=r)
+    
+        poblar(regs)
+    
+        def aplicar_filtros(_=None):
+            filtros = {i: e.get().lower() for i, e in filtro_entrys.items()}
+            poblar([r for r in regs
+                    if all(not filtros[i] or filtros[i] in str(r[i]).lower() for i in filtros)])
+    
         for ent in filtro_entrys.values():
-            ent.bind('<KeyRelease>', aplicar_filtros_plan)
-
-        # Botón “Eliminar cuenta seleccionada” (row=4)
+            ent.bind('<KeyRelease>', aplicar_filtros)
+    
+        # ---------------- Botones ----------------
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(10,0))
+        btn_frame.grid(row=3, column=0, sticky='w', pady=(10, 0))
+    
         btn_elim = ttk.Button(btn_frame, text='Eliminar cuenta seleccionada', style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar cuenta seleccionada',   style='Big.TButton')
         btn_elim.grid(row=0, column=0, padx=5)
-        btn_edit = ttk.Button(btn_frame, text='Editar cuenta seleccionada', style='Big.TButton')
         btn_edit.grid(row=0, column=1, padx=5)
-
-        def eliminar_plan():
+    
+        def eliminar():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione una cuenta.')
                 return
-            valores = tree.item(sel[0], 'values')
-            num_cuenta = valores[0]
-            if not messagebox.askyesno('Confirmar', f'¿Eliminar cuenta {num_cuenta}?'):
-                return
-
-            actuales = load_plan_cuentas()
-            nuevos = [r for r in actuales if str(r[0]) != str(num_cuenta)]
-            overwrite_records(full_path, nuevos)
-
-            regs[:] = nuevos
-            aplicar_filtros_plan()
-
-        btn_elim.config(command=eliminar_plan)
-
-        def editar_plan():
+            num = tree.item(sel[0], 'values')[0]
+            if messagebox.askyesno('Confirmar', f'¿Eliminar cuenta {num}?'):
+                nuevos = [r for r in regs if str(r[0]) != str(num)]
+                overwrite_records(full_path, nuevos)
+                regs[:] = nuevos
+                poblar(regs)
+    
+        btn_elim.configure(command=eliminar)
+    
+        def editar():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione una cuenta.')
                 return
-            vals = tree.item(sel[0], 'values')
-            num_cuenta = vals[0]
-            idx_reg = None
-            for i, r in enumerate(regs):
-                if str(r[0]) == str(num_cuenta):
-                    idx_reg = i
-                    break
-            if idx_reg is None:
-                return
-
-            orig_row = list(regs[idx_reg])
-
-            win = tk.Toplevel(self)
-            win.title('Editar cuenta')
+            idx = tree.index(sel[0])
+            num, nom = regs[idx]
+    
+            win = tk.Toplevel(self); win.title('Editar cuenta')
             ttk.Label(win, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
-            e_num = ttk.Entry(win, style='Field.TEntry')
-            e_num.grid(row=0, column=1, padx=5, pady=2)
-            e_num.insert(0, vals[0])
-            ttk.Label(win, text='Nombre:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
-            e_nom = ttk.Entry(win, style='Field.TEntry')
-            e_nom.grid(row=1, column=1, padx=5, pady=2)
-            e_nom.insert(0, vals[1])
-
+            ttk.Label(win, text='Nombre:',     style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
+    
+            e_num = ttk.Entry(win, style='Field.TEntry'); e_num.grid(row=0, column=1, padx=5, pady=2)
+            e_nom = ttk.Entry(win, style='Field.TEntry'); e_nom.grid(row=1, column=1, padx=5, pady=2)
+            e_num.insert(0, num); e_nom.insert(0, nom)
+    
             def guardar():
-                regs[idx_reg] = (e_num.get(), e_nom.get())
+                regs[idx] = (e_num.get(), e_nom.get())
                 overwrite_records(full_path, regs)
-                self._load_data()
-                aplicar_filtros_plan()
-                win.destroy()
+                poblar(regs); win.destroy()
+    
+            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
+               .grid(row=2, column=0, columnspan=2, pady=10)
+    
+        btn_edit.configure(command=editar)
+        tree.bind('<Double-1>', lambda *_: editar())
+    
+        # -------- Alta rápida --------
+        frm_new = ttk.Frame(cont, padding=5)
+        frm_new.grid(row=4, column=0, sticky='ew', pady=(15, 0))
+    
+        ttk.Label(frm_new, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0)
+        ttk.Label(frm_new, text='Nombre:',     style='Field.TLabel').grid(row=0, column=2)
+    
+        new_num = ttk.Entry(frm_new, style='Field.TEntry'); new_num.grid(row=0, column=1, padx=(5, 20))
+        new_nom = ttk.Entry(frm_new, style='Field.TEntry'); new_nom.grid(row=0, column=3, padx=(5, 0))
+    
+        def agregar():
+            if not new_num.get().strip() or not new_nom.get().strip():
+                messagebox.showwarning('Atención', 'Complete ambos campos.')
+                return
+            regs.append((new_num.get().strip(), new_nom.get().strip()))
+            save_plan_cuentas(((new_num.get().strip(), new_nom.get().strip()),))
+            poblar(regs)
+            new_num.delete(0, 'end'); new_nom.delete(0, 'end')
+    
+        ttk.Button(frm_new, text='Agregar', command=agregar, style='Big.TButton')\
+           .grid(row=1, column=0, columnspan=4, pady=(10, 0))
 
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=2, column=0, columnspan=2, pady=10)
-
-        btn_edit.config(command=editar_plan)
-        tree.bind('<Double-1>', lambda e: editar_plan())
-
-        # Formulario para agregar nuevas cuentas (row=5)
-        frm2 = ttk.Frame(cont, padding=5)
-        ttk.Label(frm2, text='Num cuenta:', style='Field.TLabel').grid(row=0, column=0)
-        cde = ttk.Entry(frm2, style='Field.TEntry')
-        cde.grid(row=0, column=1, padx=(5,20))
-        ttk.Label(frm2, text='Nombre:', style='Field.TLabel').grid(row=0, column=2)
-        cna = ttk.Entry(frm2, style='Field.TEntry')
-        cna.grid(row=0, column=3, padx=(5,0))
-        ttk.Button(frm2, text='Agregar', style='Big.TButton',
-            command=lambda: (
-                save_plan_cuentas(((cde.get(), cna.get()),)),
-                messagebox.showinfo('Éxito', 'Cuenta agregada.'),
-                self._load_data(),
-                self._show_frame('plan')
-            )
-        ).grid(row=1, column=0, columnspan=4, pady=(10,0))
-
+    # ----------------------------------------------------------------------
+#  TABLA IMPOSITIVA – COBROS
+# ----------------------------------------------------------------------
     def _build_tax_cobros(self, parent):
-        # 0) Limpiar todo
+        # 0) limpiar
         for w in parent.winfo_children():
             w.destroy()
-
-        # 1) Título principal
-        ttk.Label(parent, text='Tabla Impositiva - Cobros', style='Title.TLabel').pack(pady=10)
-
-        # 2) Sub-Frame donde usaremos grid
+    
+        ttk.Label(parent, text='Tabla Impositiva - Cobros',
+                  style='Title.TLabel').pack(pady=10)
+    
+        # 1) contenedor raíz
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
-
-        # 3) Leo registros de disco
+        cont.grid_columnconfigure(0, weight=1)
+    
+        # 2) datos
         full_path = os.path.join(ensure_data_directory(), 'tax_cobros.txt')
-        tax_data = load_tax_cobros()  # { 'cuenta': (iibb_decimal, dbcr_decimal) }
-        regs = [
-            (str(num), float(vals[0]), float(vals[1]))
-            for num, vals in tax_data.items()
-        ]
+        tax_data  = load_tax_cobros()                 # {cuenta: (iibb, dbcr)}
+        regs = [(str(c), float(v[0]), float(v[1])) for c, v in tax_data.items()]
         cols = ['Cuenta', 'Nombre', '%IIBB', '%DByCR']
-
-        cont.grid_columnconfigure(0, weight=1)
-
+    
+        # 3) Canvas + scrollbar horizontal
         table_canvas = tk.Canvas(cont, highlightthickness=0)
         table_canvas.grid(row=0, column=0, sticky='nsew')
         cont.grid_rowconfigure(0, weight=1)
-
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+    
+        hsb = ttk.Scrollbar(cont, orient='horizontal',
+                            command=table_canvas.xview)
         hsb.grid(row=1, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
-
+    
+        # 4) Frame interno
         table = ttk.Frame(table_canvas)
         table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
+        table.grid_columnconfigure(0, weight=1)          # ← que crezca
+    
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-
+            table_canvas.itemconfigure(table_win,
+                                       width=table_canvas.winfo_width())
+    
         table.bind('<Configure>', _tbl_conf)
-
+        table_canvas.bind('<Configure>', _tbl_conf)
+    
+        # ---------------- filtros ----------------
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
-
-        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-
-        filtro_frame = ttk.Frame(filtro_canvas)
-        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
-
-        filtro_entrys = {}
-        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
-        ent_cuenta.grid(row=0, column=0, padx=1, pady=0, sticky='ew')
-        filtro_frame.grid_columnconfigure(0, weight=1)
-        filtro_entrys[0] = ent_cuenta
-
-        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
-        ent_nombre.grid(row=0, column=1, padx=1, pady=0, sticky='ew')
-        filtro_frame.grid_columnconfigure(1, weight=1)
-        filtro_entrys[1] = ent_nombre
-
-        ttk.Label(filtro_frame, text='').grid(row=0, column=2, padx=1, pady=0)
-        ttk.Label(filtro_frame, text='').grid(row=0, column=3, padx=1, pady=0)
-
-        filtro_canvas.update_idletasks()
-        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
-
-        vsb = ttk.Scrollbar(table, orient='vertical')
-        filtro_canvas.configure(xscrollcommand=hsb.set)
-
-        def _tree_xview(*args):
-            filtro_canvas.xview_moveto(args[0])
-            table_canvas.xview_moveto(args[0])
-            hsb.set(*args)
-
-        tree = ttk.Treeview(
-            table,
-            columns=cols,
-            show='headings',
-            yscrollcommand=vsb.set,
-            xscrollcommand=_tree_xview
-        )
-        vsb.config(command=tree.yview)
-
-        def _scroll_x(*args):
-            tree.xview(*args)
-            filtro_canvas.xview(*args)
-            table_canvas.xview(*args)
-
-        hsb.config(command=_scroll_x)
-
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
-        vsb.grid(row=1, column=len(cols), sticky='ns')
-        table.grid_rowconfigure(1, weight=1)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-
-        for c in cols:
-            tree.heading(c, text=c, anchor='center')
-            tree.column(c, anchor='center', stretch=True)
-
-        # 9) Poblamos inicialmente
-        def poblar_tax_cobros(lista):
-            for item in tree.get_children():
-                tree.delete(item)
-            for row in lista:
-                cuenta, iibb_pct, dbcr_pct = row
-                nombre = self.plan.get(cuenta, '')
-                tree.insert(
-                    '',
-                    'end',
-                    values=(
-                        cuenta,
-                        nombre,
-                        pct_str(iibb_pct),
-                        pct_str(dbcr_pct),
-                    ),
-                )
-
-        poblar_tax_cobros(regs)
-
-        # 10) Función de filtrado (solo "Cuenta" y "Nombre")
-        def aplicar_filtros_tax_cobros(event=None):
-            filtros = {idx: ent.get().strip() for idx, ent in filtro_entrys.items()}
-            filtrados = []
-
-            for row in regs:
-                cuenta, iibb_pct, dbcr_pct = row
-                match = True
-
-                # Filtrar por "Cuenta" (col_idx = 0)
-                txt0 = filtros.get(0, "")
-                if txt0:
-                    if txt0.lower() not in cuenta.lower():
-                        match = False
-
-                # Filtrar por "Nombre" (col_idx = 1)
-                txt1 = filtros.get(1, "")
-                if match and txt1:
-                    nombre = self.plan.get(cuenta, '')
-                    if txt1.lower() not in nombre.lower():
-                        match = False
-
-                if match:
-                    filtrados.append(row)
-
-            poblar_tax_cobros(filtrados)
-
-        ent_cuenta.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
-        ent_nombre.bind('<KeyRelease>', aplicar_filtros_tax_cobros)
-
-        # 11) Botón “Eliminar seleccionado” (row=3)
-        btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(5,0))
-        boton_elim = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
-        boton_elim.grid(row=0, column=0, padx=5)
-        boton_edit = ttk.Button(btn_frame, text='Editar seleccionado', style='Big.TButton')
-        boton_edit.grid(row=0, column=1, padx=5)
-
-        def eliminar_tax_cobros():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning('Atención', 'Seleccione un registro.')
-                return
-            vals = tree.item(sel[0], 'values')
-            num_cuenta = vals[0]
-            if not messagebox.askyesno('Confirmar', f'¿Eliminar impuestos para cuenta {num_cuenta}?'):
-                return
-
-            originales = []
-            with open(full_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    tup = ast.literal_eval(line)
-                    if str(tup[0]) == str(num_cuenta):
-                        continue
-                    originales.append(tup)
-            overwrite_records(full_path, originales)
-
-            regs[:] = [
-                (str(r[0]), float(r[1]), float(r[2]))
-                for r in originales
-            ]
-            aplicar_filtros_tax_cobros()
-
-        boton_elim.config(command=eliminar_tax_cobros)
-
-        def editar_tax_cobros():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning('Atención', 'Seleccione un registro.')
-                return
-            vals = tree.item(sel[0], 'values')
-            num_cuenta = vals[0]
-            idx_reg = None
-            for i, r in enumerate(regs):
-                if str(r[0]) == str(num_cuenta):
-                    idx_reg = i
-                    break
-            if idx_reg is None:
-                return
-
-            orig_row = list(regs[idx_reg])
-
-            win = tk.Toplevel(self)
-            win.title('Editar impuestos')
-            ttk.Label(win, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0, sticky='e', padx=5, pady=2)
-            e_c = ttk.Entry(win, style='Field.TEntry')
-            e_c.grid(row=0, column=1, padx=5, pady=2)
-            e_c.insert(0, vals[0])
-            ttk.Label(win, text='%IIBB:', style='Field.TLabel').grid(row=1, column=0, sticky='e', padx=5, pady=2)
-            e_i = ttk.Entry(win, style='Field.TEntry')
-            e_i.grid(row=1, column=1, padx=5, pady=2)
-            e_i.insert(0, vals[2])
-            ttk.Label(win, text='%DByCR:', style='Field.TLabel').grid(row=2, column=0, sticky='e', padx=5, pady=2)
-            e_d = ttk.Entry(win, style='Field.TEntry')
-            e_d.grid(row=2, column=1, padx=5, pady=2)
-            e_d.insert(0, vals[3])
-
-            def guardar():
-                try:
-                    regs[idx_reg] = (
-                        e_c.get(),
-                        float(str(e_i.get()).replace(',', '.')),
-                        float(str(e_d.get()).replace(',', '.')),
-                    )
-                    persist = [
-                        (
-                            r[0],
-                            float(r[1]),
-                            float(r[2]),
-                        )
-                        for r in regs
-                    ]
-                    overwrite_records(full_path, persist)
-                    aplicar_filtros_tax_cobros()
-                    win.destroy()
-                except ValueError:
-                    messagebox.showerror('Error', 'Valores inválidos')
-
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton').grid(row=3, column=0, columnspan=2, pady=10)
-
-        boton_edit.config(command=editar_tax_cobros)
-        tree.bind('<Double-1>', lambda e: editar_tax_cobros())
-
-        # 12) Formulario “Agregar” (row=4)
-        f2 = ttk.Frame(cont, padding=5)
-        f2.grid(row=3, column=0, sticky='ew', padx=10, pady=10)
-        ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
-        e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
-
-        e_i = ttk.Entry(f2, style='Field.TEntry'); e_i.grid(row=0, column=3)
-        ttk.Label(f2, text='%DByCR:').grid(row=0, column=4, padx=10)
-        e_d = ttk.Entry(f2, style='Field.TEntry'); e_d.grid(row=0, column=5)
-        ttk.Button(
-            f2,
-            text='Agregar',
-            style='Big.TButton',
-            command=lambda: (
-                save_tax_cobros(((
-                    e_c.get(),
-                    float(str(e_i.get()).replace(',', '.')) / 100.0,
-                    float(str(e_d.get()).replace(',', '.')) / 100.0,
-                ),)),
-                messagebox.showinfo('Éxito', 'Registro Cobros agregado.'),
-                self._show_frame('tax_cobros')
-            )
-        ).grid(row=1, column=0, columnspan=6, pady=10)
-
-    def _build_tax_pagos(self, parent):
-        # 0) Limpiar el frame destino
-        for w in parent.winfo_children():
-            w.destroy()
-    
-        ttk.Label(parent, text='Tabla Impositiva - Pagos', style='Title.TLabel').pack(pady=10)
-    
-        full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
-    
-        # 1) Cargar el archivo y normalizar a lista [(cuenta, dbcr_decimal), …]
-        data = load_tax_pagos()                                   # {cuenta: 0.006, …}
-        regs = [(str(num), float(rate)) for num, rate in data.items()]
-    
-        # ---------- UI ----------
-        cont = ttk.Frame(parent, padding=5)
-        cont.pack(expand=True, fill='both')
-    
-        cols = ['Cuenta', 'Nombre', '%DByCR Banc.']
-        cont.grid_columnconfigure(0, weight=1)
-    
-        table_canvas = tk.Canvas(cont, highlightthickness=0)
-        table_canvas.grid(row=0, column=0, sticky='nsew')
-        cont.grid_rowconfigure(0, weight=1)
-
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
-        hsb.grid(row=1, column=0, sticky='ew')
-        table_canvas.configure(xscrollcommand=hsb.set)
-
-        table = ttk.Frame(table_canvas)
-        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
-        def _tbl_conf(_=None):
-            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-
-        table.bind('<Configure>', _tbl_conf)
-    
-        # Filtros
-        filtro_canvas = tk.Canvas(table, highlightthickness=0)
-        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+        filtro_canvas.grid(row=0, column=0, sticky='ew', columnspan=len(cols))
     
         filtro_frame = ttk.Frame(filtro_canvas)
-        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
+        filtro_canvas.create_window((0, 0),
+                                    window=filtro_frame, anchor='nw')
     
         filtro_entrys = {}
-        ent_cuenta = PlaceholderEntry(filtro_frame, placeholder='Cuenta', style='Field.TEntry')
-        ent_cuenta.grid(row=0, column=0, padx=1, pady=0, sticky='ew')
+        ent_cuenta = PlaceholderEntry(filtro_frame, 'Cuenta', style='Field.TEntry')
+        ent_cuenta.grid(row=0, column=0, padx=1, sticky='ew')
         filtro_frame.grid_columnconfigure(0, weight=1)
         filtro_entrys[0] = ent_cuenta
     
-        ent_nombre = PlaceholderEntry(filtro_frame, placeholder='Nombre', style='Field.TEntry')
-        ent_nombre.grid(row=0, column=1, padx=1, pady=0, sticky='ew')
+        ent_nombre = PlaceholderEntry(filtro_frame, 'Nombre', style='Field.TEntry')
+        ent_nombre.grid(row=0, column=1, padx=1, sticky='ew')
         filtro_frame.grid_columnconfigure(1, weight=1)
         filtro_entrys[1] = ent_nombre
     
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
     
-        # Tabla principal
+        # ---------------- Treeview ----------------
         vsb = ttk.Scrollbar(table, orient='vertical')
     
         def _tree_xview(*args):
@@ -2221,43 +1956,48 @@ class App(tk.Tk):
     
         hsb.config(command=_scroll_x)
     
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
-        vsb.grid(row=1, column=len(cols), sticky='ns')
+        tree.grid(row=1, column=0, sticky='nsew')
+        vsb.grid(row=1, column=1, sticky='ns')
         table.grid_rowconfigure(1, weight=1)
     
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=140, anchor='center', stretch=True)
+            tree.column(c, anchor='center', stretch=True, width=140)
     
         # ---------- helpers ----------
         def poblar(lista):
             tree.delete(*tree.get_children())
-            for cuenta, pct_dbcr in lista:
-                nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, pct_str(pct_dbcr)))
+            for cuenta, iibb, dbcr in lista:
+                tree.insert('', 'end',
+                            values=(cuenta,
+                                    self.plan.get(cuenta, ''),
+                                    pct_str(iibb),
+                                    pct_str(dbcr)))
     
         poblar(regs)
     
         def aplicar_filtros(_=None):
-            filtros = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
+            f = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
             filtrados = []
-            for cuenta, pct_dbcr in regs:
+            for cuenta, iibb, dbcr in regs:
                 nombre = self.plan.get(cuenta, '')
-                if filtros[0] and filtros[0] not in cuenta.lower():
+                if f[0] and f[0] not in cuenta.lower():
                     continue
-                if filtros[1] and filtros[1] not in nombre.lower():
+                if f[1] and f[1] not in nombre.lower():
                     continue
-                filtrados.append((cuenta, pct_dbcr))
+                filtrados.append((cuenta, iibb, dbcr))
             poblar(filtrados)
     
         ent_cuenta.bind('<KeyRelease>', aplicar_filtros)
         ent_nombre.bind('<KeyRelease>', aplicar_filtros)
     
-        # ---------- botones ----------
+        # ---------------- botones ----------------
         btn_frame = ttk.Frame(cont)
         btn_frame.grid(row=2, column=0, sticky='w', pady=(10, 0))
-        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
-        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',   style='Big.TButton')
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado',
+                              style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',
+                              style='Big.TButton')
         btn_del.grid(row=0, column=0, padx=5)
         btn_edit.grid(row=0, column=1, padx=5)
     
@@ -2266,12 +2006,12 @@ class App(tk.Tk):
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
-            cuenta_sel = tree.item(sel[0], 'values')[0]
+            cuenta = tree.item(sel[0], 'values')[0]
             if not messagebox.askyesno('Confirmar',
-                                       f'¿Eliminar impuestos para cuenta {cuenta_sel}?'):
+                                       f'¿Eliminar impuestos para {cuenta}?'):
                 return
-            regs[:] = [(c, r) for c, r in regs if c != cuenta_sel]
-            overwrite_records(full_path, regs)          # se graban como decimales
+            regs[:] = [r for r in regs if r[0] != cuenta]
+            overwrite_records(full_path, regs)
             aplicar_filtros()
     
         btn_del.configure(command=eliminar)
@@ -2281,117 +2021,129 @@ class App(tk.Tk):
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
-            cuenta_sel, _, pct_texto = tree.item(sel[0], 'values')
-            idx = next(i for i, (c, _) in enumerate(regs) if c == cuenta_sel)
+            cuenta, _, iibb_txt, dbcr_txt = tree.item(sel[0], 'values')
+            idx = next(i for i, r in enumerate(regs) if r[0] == cuenta)
     
-            win = tk.Toplevel(self)
-            win.title('Editar impuesto')
-            ttk.Label(win, text='Cuenta:',          style='Field.TLabel').grid(row=0, column=0, sticky='e')
-            ttk.Label(win, text='%DByCR Banc.:',    style='Field.TLabel').grid(row=1, column=0, sticky='e')
-    
-            e_c = ttk.Entry(win, style='Field.TEntry'); e_c.grid(row=0, column=1, padx=5, pady=2)
-            e_d = ttk.Entry(win, style='Field.TEntry'); e_d.grid(row=1, column=1, padx=5, pady=2)
-            e_c.insert(0, cuenta_sel)
-            e_d.insert(0, pct_texto)
+            win = tk.Toplevel(self); win.title('Editar impuestos')
+            for i, lab in enumerate(('Cuenta', '%IIBB', '%DByCR')):
+                ttk.Label(win, text=f'{lab}:', style='Field.TLabel')\
+                   .grid(row=i, column=0, sticky='e', padx=5, pady=2)
+            e_c = ttk.Entry(win, style='Field.TEntry'); e_c.grid(row=0, column=1)
+            e_i = ttk.Entry(win, style='Field.TEntry'); e_i.grid(row=1, column=1)
+            e_d = ttk.Entry(win, style='Field.TEntry'); e_d.grid(row=2, column=1)
+            e_c.insert(0, cuenta); e_i.insert(0, iibb_txt); e_d.insert(0, dbcr_txt)
     
             def guardar():
                 try:
-                    cuenta = e_c.get().strip()
-                    pct_ui = float(str(e_d.get()).replace(',', '.'))
-                    pct_dec = pct_ui / 100.0                     # ⇒ decimal
-                    regs[idx] = (cuenta, pct_dec)
+                    nuevo = (e_c.get().strip(),
+                             float(str(e_i.get()).replace(',', '.'))/100.0,
+                             float(str(e_d.get()).replace(',', '.'))/100.0)
+                    regs[idx] = nuevo
                     overwrite_records(full_path, regs)
-                    aplicar_filtros()
-                    win.destroy()
+                    aplicar_filtros(); win.destroy()
                 except ValueError:
-                    messagebox.showerror('Error', 'Valor inválido.')
+                    messagebox.showerror('Error', 'Valores inválidos.')
     
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
-               .grid(row=2, column=0, columnspan=2, pady=10)
+            ttk.Button(win, text='Guardar', command=guardar,
+                       style='Big.TButton').grid(row=3, column=0,
+                                                 columnspan=2, pady=10)
     
         btn_edit.configure(command=editar)
+        tree.bind('<Double-1>', lambda *_: editar())
     
-        # ---------- alta rápida ----------
+        # -------- alta rápida --------
         frm_add = ttk.Frame(cont, padding=5)
         frm_add.grid(row=3, column=0, sticky='ew', pady=(10, 0))
-    
-        ttk.Label(frm_add, text='Cuenta:',        style='Field.TLabel').grid(row=0, column=0)
-        ttk.Label(frm_add, text='%DByCR Banc.:',  style='Field.TLabel').grid(row=0, column=2)
-    
-        add_c = ttk.Entry(frm_add, style='Field.TEntry'); add_c.grid(row=0, column=1, padx=(5, 20))
-        add_d = ttk.Entry(frm_add, style='Field.TEntry'); add_d.grid(row=0, column=3, padx=(5, 0))
+        for i, lab in enumerate(('Cuenta', '%IIBB', '%DByCR')):
+            ttk.Label(frm_add, text=f'{lab}:', style='Field.TLabel')\
+               .grid(row=0, column=2*i)
+        add_c = ttk.Entry(frm_add, style='Field.TEntry'); add_c.grid(row=0, column=1, padx=(5,20))
+        add_i = ttk.Entry(frm_add, style='Field.TEntry'); add_i.grid(row=0, column=3, padx=5)
+        add_d = ttk.Entry(frm_add, style='Field.TEntry'); add_d.grid(row=0, column=5, padx=5)
     
         def agregar():
             try:
-                cuenta = add_c.get().strip()
-                pct_ui = float(str(add_d.get()).replace(',', '.'))
-                pct_dec = pct_ui / 100.0
-                regs.append((cuenta, pct_dec))
-                save_tax_pagos(((cuenta, pct_dec),))
+                nuevo = (add_c.get().strip(),
+                         float(str(add_i.get()).replace(',', '.'))/100.0,
+                         float(str(add_d.get()).replace(',', '.'))/100.0)
+                regs.append(nuevo)
+                save_tax_cobros((nuevo,))
                 poblar(regs)
-                add_c.delete(0, 'end'); add_d.delete(0, 'end')
+                add_c.delete(0,'end'); add_i.delete(0,'end'); add_d.delete(0,'end')
             except ValueError:
-                messagebox.showerror('Error', 'Valor inválido.')
+                messagebox.showerror('Error', 'Valores inválidos.')
     
-        ttk.Button(
-            frm_add,
-            text='Agregar',
-            command=agregar,
-            style='Big.TButton'
-        ).grid(row=1, column=0, columnspan=4, pady=(10, 0))
+        ttk.Button(frm_add, text='Agregar', command=agregar,
+                   style='Big.TButton').grid(row=1, column=0,
+                                             columnspan=6, pady=(10,0))
 
 
-
-    def _build_expensas(self, parent):
-        # 0) Limpiar el contenido del frame
+# ----------------------------------------------------------------------
+#  TABLA IMPOSITIVA – PAGOS
+# ----------------------------------------------------------------------
+    def _build_tax_pagos(self, parent):
+        # 0) limpiar
         for w in parent.winfo_children():
             w.destroy()
     
-        ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
+        ttk.Label(parent, text='Tabla Impositiva - Pagos',
+                  style='Title.TLabel').pack(pady=10)
     
-        # --- cargar datos ---
-        full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
-        regs = storage.load_expensas()           # [(cuenta, fecha, monto), …]
-        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
+        full_path = os.path.join(ensure_data_directory(), 'tax_pagos.txt')
+        data = load_tax_pagos()                        # {cuenta: dec}
+        regs = [(str(c), float(v)) for c, v in data.items()]
+        cols = ['Cuenta', 'Nombre', '%DByCR Banc.']
     
-        if not regs:
-            ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
-            return
-    
-        # --- contenedor principal ---
+        # 1) contenedor
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
         cont.grid_columnconfigure(0, weight=1)
     
-        # ---------------- Tabla ----------------
+        # 2) Canvas + scroll H
         table_canvas = tk.Canvas(cont, highlightthickness=0)
         table_canvas.grid(row=0, column=0, sticky='nsew')
         cont.grid_rowconfigure(0, weight=1)
     
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        hsb = ttk.Scrollbar(cont, orient='horizontal',
+                            command=table_canvas.xview)
         hsb.grid(row=1, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
     
+        # 3) Frame interno
         table = ttk.Frame(table_canvas)
         table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
+        table.grid_columnconfigure(0, weight=1)          # ← crecer
+    
+        def _tbl_conf(_=None):
+            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
+            table_canvas.itemconfigure(table_win,
+                                       width=table_canvas.winfo_width())
+    
+        table.bind('<Configure>', _tbl_conf)
+        table_canvas.bind('<Configure>', _tbl_conf)
+    
+        # ---------------- filtros ----------------
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
-        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
+        filtro_canvas.grid(row=0, column=0, sticky='ew', columnspan=len(cols))
     
         filtro_frame = ttk.Frame(filtro_canvas)
         filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
     
         filtro_entrys = {}
-        for idx, col in enumerate(cols):
-            ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
-            ent.grid(row=0, column=idx, padx=1, sticky='ew')
-            filtro_frame.grid_columnconfigure(idx, weight=1)
-            filtro_entrys[idx] = ent
+        ent_cuenta = PlaceholderEntry(filtro_frame, 'Cuenta', style='Field.TEntry')
+        ent_cuenta.grid(row=0, column=0, padx=1, sticky='ew')
+        filtro_frame.grid_columnconfigure(0, weight=1)
+        filtro_entrys[0] = ent_cuenta
+    
+        ent_nombre = PlaceholderEntry(filtro_frame, 'Nombre', style='Field.TEntry')
+        ent_nombre.grid(row=0, column=1, padx=1, sticky='ew')
+        filtro_frame.grid_columnconfigure(1, weight=1)
+        filtro_entrys[1] = ent_nombre
     
         filtro_canvas.update_idletasks()
         filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
     
-        # --- Treeview ---
+        # ---------------- Treeview ----------------
         vsb = ttk.Scrollbar(table, orient='vertical')
     
         def _tree_xview(*args):
@@ -2399,274 +2151,52 @@ class App(tk.Tk):
             table_canvas.xview_moveto(args[0])
             hsb.set(*args)
     
-        tree = ttk.Treeview(
-            table,
-            columns=cols,
-            show='headings',
-            yscrollcommand=vsb.set,
-            xscrollcommand=_tree_xview
-        )
+        tree = ttk.Treeview(table, columns=cols, show='headings',
+                            yscrollcommand=vsb.set, xscrollcommand=_tree_xview)
         vsb.config(command=tree.yview)
     
         def _scroll_x(*args):
             tree.xview(*args)
             filtro_canvas.xview(*args)
             table_canvas.xview(*args)
+    
         hsb.config(command=_scroll_x)
     
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
-        vsb.grid(row=1, column=len(cols), sticky='ns')
+        tree.grid(row=1, column=0, sticky='nsew')
+        vsb.grid(row=1, column=1, sticky='ns')
         table.grid_rowconfigure(1, weight=1)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
     
         for c in cols:
             tree.heading(c, text=c, anchor='center')
-            tree.column(c, anchor='center', stretch=True, minwidth=130)
+            tree.column(c, anchor='center', stretch=True, width=140)
     
-        # --- helpers de datos ---
-        def poblar_exp(lista):
-            tree.delete(*tree.get_children())
-            for cuenta, fecha, monto in lista:
-                nombre = self.plan.get(cuenta, '')
-                tree.insert('', 'end', values=(cuenta, nombre, fecha, monto))
-    
-        poblar_exp(regs)
-    
-        def aplicar_filtros_exp(_=None):
-            filtros = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
-            filtrados = []
-            for cuenta, fecha, monto in regs:
-                nombre = self.plan.get(cuenta, '')
-                celdas = [cuenta, nombre, fecha, str(monto)]
-                if all(not f or f in c.lower() for f, c in zip(filtros.values(), celdas)):
-                    filtrados.append((cuenta, fecha, monto))
-            poblar_exp(filtrados)
-    
-        for ent in filtro_entrys.values():
-            ent.bind('<KeyRelease>', aplicar_filtros_exp)
-    
-        # ---------------- Botones ----------------
-        btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(5, 0))
-    
-        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
-        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',   style='Big.TButton')
-        btn_del.grid(row=0, column=0, padx=5)
-        btn_edit.grid(row=0, column=1, padx=5)
-    
-        def eliminar_exp():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning('Atención', 'Seleccione un registro.')
-                return
-            cuenta_v, _, fecha_v, monto_v = tree.item(sel[0], 'values')
-            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
-                return
-            datos = storage.load_expensas()
-            datos = [r for r in datos
-                     if not (str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v)
-                             and float(r[2]) == float(monto_v))]
-            storage.save_expensas(datos)
-            regs[:] = datos
-            self._load_data()
-            poblar_exp(regs)
-    
-        btn_del.configure(command=eliminar_exp)
-    
-        def editar_exp():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning('Atención', 'Seleccione un registro.')
-                return
-            orig_vals = tree.item(sel[0], 'values')          # (cuenta, nombre, fecha, monto)
-            cuenta_v, fecha_v, monto_v = orig_vals[0], orig_vals[2], float(orig_vals[3])
-    
-            win = tk.Toplevel(self); win.title('Editar expensa')
-            labels = ['Cuenta', 'Fecha', 'Monto']
-            entries = []
-            for i, lab in enumerate(labels):
-                ttk.Label(win, text=f'{lab}:', style='Field.TLabel')\
-                   .grid(row=i, column=0, sticky='e', padx=5, pady=2)
-                e = ttk.Entry(win, style='Field.TEntry')
-                e.grid(row=i, column=1, padx=5, pady=2)
-                e.insert(0, orig_vals[0 if lab == 'Cuenta' else 2 if lab == 'Fecha' else 3])
-                entries.append(e)
-    
-            def guardar():
-                try:
-                    cuenta_n = entries[0].get().strip()
-                    fecha_n  = entries[1].get().strip()
-                    monto_n  = float(entries[2].get())
-                except ValueError:
-                    messagebox.showerror('Error', 'Monto inválido')
-                    return
-                datos = storage.load_expensas()
-                for i, r in enumerate(datos):
-                    if str(r[0]) == str(cuenta_v) and str(r[1]) == str(fecha_v) and float(r[2]) == monto_v:
-                        datos[i] = (cuenta_n, fecha_n, monto_n)
-                        break
-                storage.save_expensas(datos)
-                regs[:] = datos
-                self._load_data()
-                poblar_exp(regs)
-                win.destroy()
-    
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
-               .grid(row=3, column=0, columnspan=2, pady=10)
-    
-        btn_edit.configure(command=editar_exp)
-        tree.bind('<Double-1>', lambda _=None: editar_exp())
-    
-        # ---------------- Monto por defecto (fila 3) ----------------
-        default_amt = storage.load_expensa_default()
-    
-        frm_def = ttk.Frame(cont)
-        frm_def.grid(row=3, column=0, sticky='w', pady=(10, 0))
-    
-    def _build_liquidaciones(self, parent):
-        # ───────── limpiar frame ─────────
-        for w in parent.winfo_children():
-            w.destroy()
-
-    
-        ttk.Label(parent, text='Liquidaciones', style='Title.TLabel').pack(pady=10)
-    
-        regs = storage.load_liquidaciones()
-        if not regs:
-            ttk.Label(parent, text='Sin registros.', style='Field.TLabel').pack(pady=20)
-            return
-    
-        # ───────── columnas ─────────
-        cols = ['Cuenta', 'Nombre', 'Parcela', 'Fecha', 'Monto']
-    
-        cont = ttk.Frame(parent, padding=5)
-        cont.pack(expand=True, fill='both')
-        cont.grid_columnconfigure(0, weight=1)
-    
-        table_canvas = tk.Canvas(cont, highlightthickness=0)
-        table_canvas.grid(row=0, column=0, sticky='nsew')
-        cont.grid_rowconfigure(0, weight=1)
-    
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
-        hsb.grid(row=1, column=0, sticky='ew')
-        table_canvas.configure(xscrollcommand=hsb.set)
-    
-        table = ttk.Frame(table_canvas)
-        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-    
-        table.bind('<Configure>', lambda _=None:
-                   table_canvas.configure(scrollregion=table_canvas.bbox('all')))
-    
-        # ───────── filtros ─────────
-        filtro_canvas = tk.Canvas(table, highlightthickness=0)
-        filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
-    
-        filtro_frame = ttk.Frame(filtro_canvas)
-        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
-    
-        filtro_entrys = {}
-        for idx, col in enumerate(cols):
-            ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
-            ent.grid(row=0, column=idx, padx=1, sticky='ew')
-            filtro_frame.grid_columnconfigure(idx, weight=1)
-            filtro_entrys[idx] = ent
-        filtro_canvas.update_idletasks()
-        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
-
-        vsb = ttk.Scrollbar(table, orient='vertical')
-    
-        def _tree_xview(*args):
-            filtro_canvas.xview_moveto(args[0])
-            table_canvas.xview_moveto(args[0])
-            hsb.set(*args)
-    
-        tree = ttk.Treeview(
-            table,
-            columns=cols,
-            show='headings',
-            yscrollcommand=vsb.set,
-            xscrollcommand=_tree_xview
-        )
-        vsb.config(command=tree.yview)
-        hsb.config(command=lambda *a: (_scroll_x := lambda *b: (tree.xview(*b),
-                                                              filtro_canvas.xview(*b),
-                                                              table_canvas.xview(*b)))(*a))
-    
-        tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
-        vsb.grid(row=1, column=len(cols), sticky='ns')
-        table.grid_rowconfigure(1, weight=1)
-    
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-        for c in cols:
-            tree.heading(c, text=c, anchor='center')
-            tree.column(c, width=130 if c != 'Nombre' else 220, anchor='center')
-    
-        # ───────── helpers ─────────
-        def nombre_a_cuenta(nom: str) -> str:
-            for cod, nombre in self.plan.items():
-                if cod.startswith('11-26') and nombre == nom:
-                    return cod
-            return '—'
-    
-        def to_display(row):
-            """
-            Devuelve (cuenta, nombre, parcela, fecha, monto) a partir de la tupla cruda.
-            • Si len(row) == 5 asumimos que ya viene normalizada.
-            • Caso contrario aplicamos la lógica de compatibilidad.
-            """
-            if len(row) == 5:                        # ← NUEVA VÍA RÁPIDA
-                return tuple(row)
-        
-            # ---- compatibilidad con registros antiguos ----
-            offset = 1 if len(row) == 6 and str(row[0]).isdigit() else 0
-        
-            if len(row) >= 5 - offset and str(row[offset]).startswith('11-26'):
-                cuenta  = str(row[offset])
-                nombre  = str(row[offset + 1])
-                parcela = str(row[offset + 2]) if len(row) > offset + 2 else ''
-                fecha   = str(row[offset + 3]) if len(row) > offset + 3 else ''
-                monto   = row[offset + 4]        if len(row) > offset + 4 else ''
-                return (cuenta, nombre, parcela, fecha, monto)
-        
-            nombre  = str(row[offset])
-            parcela = str(row[offset + 1]) if len(row) > offset + 1 else ''
-            if len(row) > offset + 3 and all(str(row[offset + i]).isdigit() for i in (2, 3)):
-                mes  = int(row[offset + 2]); anio = str(row[offset + 3])
-                fecha = f"{anio}-{mes:02d}"
-                monto = row[offset + 4] if len(row) > offset + 4 else ''
-            else:
-                fecha = str(row[offset + 2]) if len(row) > offset + 2 else ''
-                monto = row[offset + 3]      if len(row) > offset + 3 else ''
-            cuenta = nombre_a_cuenta(nombre)
-            return (cuenta, nombre, parcela, fecha, monto)
-
-    
-        # ───────── poblar ─────────
+        # ---------- helpers ----------
         def poblar(lista):
             tree.delete(*tree.get_children())
-            for i, r in enumerate(lista):
-                tree.insert('', 'end', iid=str(i), values=to_display(r))
+            for cuenta, dbcr in lista:
+                tree.insert('', 'end',
+                            values=(cuenta,
+                                    self.plan.get(cuenta, ''),
+                                    pct_str(dbcr)))
     
         poblar(regs)
     
-        # ───────── filtros ─────────
         def aplicar_filtros(_=None):
-            filtros = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
-            filtrados = []
-            for r in regs:
-                dis = to_display(r)
-                if all((not filtros[i]) or filtros[i] in str(dis[i]).lower() for i in filtros):
-                    filtrados.append(r)
-            poblar(filtrados)
+            f = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
+            poblar([(c, d) for c, d in regs
+                    if (not f[0] or f[0] in c.lower()) and
+                       (not f[1] or f[1] in self.plan.get(c, '').lower())])
     
-        for ent in filtro_entrys.values():
-            ent.bind('<KeyRelease>', aplicar_filtros)
+        ent_cuenta.bind('<KeyRelease>', aplicar_filtros)
+        ent_nombre.bind('<KeyRelease>', aplicar_filtros)
     
-        # ───────── acciones ─────────
+        # ---------------- botones ----------------
         btn_frame = ttk.Frame(cont)
-        btn_frame.grid(row=2, column=0, sticky='w', pady=(5, 0))
-        btn_del = ttk.Button(btn_frame, text='Eliminar seleccionado', style='Big.TButton')
-        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',  style='Big.TButton')
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(10, 0))
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado',
+                              style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',
+                              style='Big.TButton')
         btn_del.grid(row=0, column=0, padx=5)
         btn_edit.grid(row=0, column=1, padx=5)
     
@@ -2675,25 +2205,426 @@ class App(tk.Tk):
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
-            idx = int(sel[0])
-            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
+            cuenta = tree.item(sel[0], 'values')[0]
+            if not messagebox.askyesno('Confirmar',
+                                       f'¿Eliminar impuestos para {cuenta}?'):
                 return
-            d = storage.load_liquidaciones()
-            if 0 <= idx < len(d):
-                d.pop(idx)
-                storage.save_liquidaciones(d)
-                regs[:] = d
-                poblar(regs)
+            regs[:] = [(c, r) for c, r in regs if c != cuenta]
+            overwrite_records(full_path, regs)
+            aplicar_filtros()
+    
+        btn_del.configure(command=eliminar)
     
         def editar():
             sel = tree.selection()
             if not sel:
                 messagebox.showwarning('Atención', 'Seleccione un registro.')
                 return
+            cuenta, _, pct_txt = tree.item(sel[0], 'values')
+            idx = next(i for i, (c, _) in enumerate(regs) if c == cuenta)
+    
+            win = tk.Toplevel(self); win.title('Editar impuesto')
+            ttk.Label(win, text='Cuenta:', style='Field.TLabel')\
+               .grid(row=0, column=0, sticky='e', padx=5, pady=2)
+            ttk.Label(win, text='%DByCR Banc.:', style='Field.TLabel')\
+               .grid(row=1, column=0, sticky='e', padx=5, pady=2)
+    
+            e_c = ttk.Entry(win, style='Field.TEntry'); e_c.grid(row=0, column=1)
+            e_d = ttk.Entry(win, style='Field.TEntry'); e_d.grid(row=1, column=1)
+            e_c.insert(0, cuenta); e_d.insert(0, pct_txt)
+    
+            def guardar():
+                try:
+                    nuevo = (e_c.get().strip(),
+                             float(str(e_d.get()).replace(',', '.'))/100.0)
+                    regs[idx] = nuevo
+                    overwrite_records(full_path, regs)
+                    aplicar_filtros(); win.destroy()
+                except ValueError:
+                    messagebox.showerror('Error', 'Valor inválido.')
+    
+            ttk.Button(win, text='Guardar', command=guardar,
+                       style='Big.TButton').grid(row=2, column=0,
+                                                 columnspan=2, pady=10)
+    
+        btn_edit.configure(command=editar)
+        tree.bind('<Double-1>', lambda *_: editar())
+    
+        # -------- alta rápida --------
+        frm_add = ttk.Frame(cont, padding=5)
+        frm_add.grid(row=3, column=0, sticky='ew', pady=(10, 0))
+        ttk.Label(frm_add, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
+        ttk.Label(frm_add, text='%DByCR Banc.:', style='Field.TLabel').grid(row=0, column=2)
+        add_c = ttk.Entry(frm_add, style='Field.TEntry'); add_c.grid(row=0, column=1, padx=(5,20))
+        add_d = ttk.Entry(frm_add, style='Field.TEntry'); add_d.grid(row=0, column=3, padx=5)
+    
+        def agregar():
+            try:
+                nuevo = (add_c.get().strip(),
+                         float(str(add_d.get()).replace(',', '.'))/100.0)
+                regs.append(nuevo)
+                save_tax_pagos((nuevo,))
+                poblar(regs)
+                add_c.delete(0,'end'); add_d.delete(0,'end')
+            except ValueError:
+                messagebox.showerror('Error', 'Valor inválido.')
+    
+        ttk.Button(frm_add, text='Agregar', command=agregar,
+                   style='Big.TButton').grid(row=1, column=0,
+                                             columnspan=4, pady=(10,0))
+
+
+# ------------------------------------------------------------------
+#  EXPENSAS
+# ------------------------------------------------------------------
+    def _build_expensas(self, parent):
+        # 0) limpiar
+        for w in parent.winfo_children():
+            w.destroy()
+    
+        ttk.Label(parent, text='Expensas', style='Title.TLabel').pack(pady=10)
+    
+        # 1) datos
+        full_path = os.path.join(ensure_data_directory(), 'expensas.txt')
+        regs = storage.load_expensas()          # [(cuenta, fecha, monto), …]
+        cols = ['Cuenta', 'Nombre', 'Fecha', 'Monto']
+    
+        if not regs:
+            ttk.Label(parent, text='Sin registros.', style='Field.TLabel')\
+               .pack(pady=20)
+            return
+    
+        # 2) contenedor raíz
+        cont = ttk.Frame(parent, padding=5)
+        cont.pack(expand=True, fill='both')
+        cont.grid_columnconfigure(0, weight=1)
+    
+        # 3) Canvas + barra H
+        table_canvas = tk.Canvas(cont, highlightthickness=0)
+        table_canvas.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+    
+        hsb = ttk.Scrollbar(cont, orient='horizontal',
+                            command=table_canvas.xview)
+        hsb.grid(row=1, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+    
+        # 4) Frame interno
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
+        table.grid_columnconfigure(0, weight=1)
+    
+        def _tbl_conf(_=None):
+            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
+            table_canvas.itemconfigure(table_win,
+                                       width=table_canvas.winfo_width())
+    
+        table.bind('<Configure>', _tbl_conf)
+        table_canvas.bind('<Configure>', _tbl_conf)
+    
+        # ---------------- filtros ----------------
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, sticky='ew', columnspan=len(cols))
+    
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
+    
+        filtro_entrys = {}
+        for i, col in enumerate(cols):
+            ent = PlaceholderEntry(filtro_frame, col, style='Field.TEntry')
+            ent.grid(row=0, column=i, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(i, weight=1)
+            filtro_entrys[i] = ent
+    
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+    
+        # ---------------- Treeview ----------------
+        vsb = ttk.Scrollbar(table, orient='vertical')
+    
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            table_canvas.xview_moveto(args[0])
+            hsb.set(*args)
+    
+        tree = ttk.Treeview(table, columns=cols, show='headings',
+                            yscrollcommand=vsb.set, xscrollcommand=_tree_xview)
+        vsb.config(command=tree.yview)
+    
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+            table_canvas.xview(*args)
+    
+        hsb.config(command=_scroll_x)
+    
+        tree.grid(row=1, column=0, sticky='nsew')
+        vsb.grid(row=1, column=1, sticky='ns')
+        table.grid_rowconfigure(1, weight=1)
+    
+        for c in cols:
+            tree.heading(c, text=c, anchor='center')
+            tree.column(c, anchor='center', stretch=True, width=130)
+    
+        # ---------- helpers ----------
+        def poblar(lista):
+            tree.delete(*tree.get_children())
+            for cuenta, fecha, monto in lista:
+                tree.insert('', 'end',
+                            values=(cuenta,
+                                    self.plan.get(cuenta, ''),
+                                    fecha, monto))
+    
+        poblar(regs)
+    
+        def aplicar_filtros(_=None):
+            f = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
+            filtrados = []
+            for cuenta, fecha, monto in regs:
+                nombre = self.plan.get(cuenta, '')
+                celdas = [cuenta, nombre, fecha, str(monto)]
+                if all(not f[i] or f[i] in c.lower() for i, c in enumerate(celdas)):
+                    filtrados.append((cuenta, fecha, monto))
+            poblar(filtrados)
+    
+        for ent in filtro_entrys.values():
+            ent.bind('<KeyRelease>', aplicar_filtros)
+    
+        # ---------------- botones ----------------
+        btn_frame = ttk.Frame(cont)
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(5, 0))
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado',
+                              style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',
+                              style='Big.TButton')
+        btn_del.grid(row=0, column=0, padx=5)
+        btn_edit.grid(row=0, column=1, padx=5)
+    
+        def eliminar_exp():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.'); return
+            cta, _, fec, mon = tree.item(sel[0], 'values')
+            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
+                return
+            datos = [r for r in storage.load_expensas()
+                     if not (str(r[0]) == str(cta) and str(r[1]) == str(fec)
+                             and float(r[2]) == float(mon))]
+            storage.save_expensas(datos)
+            regs[:] = datos
+            poblar(regs)
+    
+        btn_del.configure(command=eliminar_exp)
+    
+        def editar_exp():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.'); return
+            orig = tree.item(sel[0], 'values')      # (cta, nom, fec, mon)
+            cta_v, fec_v, mon_v = orig[0], orig[2], float(orig[3])
+    
+            win = tk.Toplevel(self); win.title('Editar expensa')
+            for i, lab in enumerate(('Cuenta', 'Fecha', 'Monto')):
+                ttk.Label(win, text=f'{lab}:', style='Field.TLabel')\
+                   .grid(row=i, column=0, sticky='e', padx=5, pady=2)
+            e_c = ttk.Entry(win, style='Field.TEntry'); e_c.grid(row=0, column=1)
+            e_f = ttk.Entry(win, style='Field.TEntry'); e_f.grid(row=1, column=1)
+            e_m = ttk.Entry(win, style='Field.TEntry'); e_m.grid(row=2, column=1)
+            e_c.insert(0, cta_v); e_f.insert(0, fec_v); e_m.insert(0, mon_v)
+    
+            def guardar():
+                try:
+                    nuevo = (e_c.get().strip(),
+                             e_f.get().strip(),
+                             float(e_m.get()))
+                except ValueError:
+                    messagebox.showerror('Error', 'Monto inválido'); return
+                datos = storage.load_expensas()
+                for i, r in enumerate(datos):
+                    if str(r[0]) == str(cta_v) and str(r[1]) == str(fec_v) and float(r[2]) == mon_v:
+                        datos[i] = nuevo; break
+                storage.save_expensas(datos)
+                regs[:] = datos
+                poblar(regs); win.destroy()
+    
+            ttk.Button(win, text='Guardar', command=guardar,
+                       style='Big.TButton').grid(row=3, column=0,
+                                                 columnspan=2, pady=10)
+    
+        btn_edit.configure(command=editar_exp)
+        tree.bind('<Double-1>', lambda *_: editar_exp())
+
+
+# ------------------------------------------------------------------
+#  LIQUIDACIONES
+# ------------------------------------------------------------------
+    def _build_liquidaciones(self, parent):
+        # 0) limpiar
+        for w in parent.winfo_children():
+            w.destroy()
+    
+        ttk.Label(parent, text='Liquidaciones', style='Title.TLabel').pack(pady=10)
+    
+        regs = storage.load_liquidaciones()
+        if not regs:
+            ttk.Label(parent, text='Sin registros.', style='Field.TLabel')\
+               .pack(pady=20)
+            return
+    
+        cols = ['Cuenta', 'Nombre', 'Parcela', 'Fecha', 'Monto']
+    
+        # 1) contenedor
+        cont = ttk.Frame(parent, padding=5)
+        cont.pack(expand=True, fill='both')
+        cont.grid_columnconfigure(0, weight=1)
+    
+        # 2) Canvas + H-scroll
+        table_canvas = tk.Canvas(cont, highlightthickness=0)
+        table_canvas.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+    
+        hsb = ttk.Scrollbar(cont, orient='horizontal',
+                            command=table_canvas.xview)
+        hsb.grid(row=1, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+    
+        # 3) Frame interno
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
+        table.grid_columnconfigure(0, weight=1)
+    
+        def _tbl_conf(_=None):
+            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
+            table_canvas.itemconfigure(table_win,
+                                       width=table_canvas.winfo_width())
+    
+        table.bind('<Configure>', _tbl_conf)
+        table_canvas.bind('<Configure>', _tbl_conf)
+    
+        # ---------------- filtros ----------------
+        filtro_canvas = tk.Canvas(table, highlightthickness=0)
+        filtro_canvas.grid(row=0, column=0, sticky='ew', columnspan=len(cols))
+    
+        filtro_frame = ttk.Frame(filtro_canvas)
+        filtro_canvas.create_window((0, 0), window=filtro_frame, anchor='nw')
+    
+        filtro_entrys = {}
+        for i, col in enumerate(cols):
+            ent = PlaceholderEntry(filtro_frame, col, style='Field.TEntry')
+            ent.grid(row=0, column=i, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(i, weight=1)
+            filtro_entrys[i] = ent
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+    
+        # ---------------- Treeview ----------------
+        vsb = ttk.Scrollbar(table, orient='vertical')
+    
+        def _tree_xview(*args):
+            filtro_canvas.xview_moveto(args[0])
+            table_canvas.xview_moveto(args[0])
+            hsb.set(*args)
+    
+        tree = ttk.Treeview(table, columns=cols, show='headings',
+                            yscrollcommand=vsb.set, xscrollcommand=_tree_xview)
+        vsb.config(command=tree.yview)
+    
+        def _scroll_x(*args):
+            tree.xview(*args)
+            filtro_canvas.xview(*args)
+            table_canvas.xview(*args)
+    
+        hsb.config(command=_scroll_x)
+    
+        tree.grid(row=1, column=0, sticky='nsew')
+        vsb.grid(row=1, column=1, sticky='ns')
+        table.grid_rowconfigure(1, weight=1)
+    
+        for c in cols:
+            tree.heading(c, text=c, anchor='center')
+            tree.column(c, anchor='center',
+                        width=220 if c == 'Nombre' else 130, stretch=True)
+    
+        # ---------- helpers ----------
+        def nombre_a_cuenta(nom):
+            for cod, n in self.plan.items():
+                if cod.startswith('11-26') and n == nom:
+                    return cod
+            return '—'
+    
+        def to_display(row):
+            if len(row) == 5:
+                return tuple(row)
+            offset = 1 if len(row) == 6 and str(row[0]).isdigit() else 0
+            if len(row) >= 5-offset and str(row[offset]).startswith('11-26'):
+                cuenta, nombre = str(row[offset]), str(row[offset+1])
+                parcela = str(row[offset+2]) if len(row) > offset+2 else ''
+                fecha   = str(row[offset+3]) if len(row) > offset+3 else ''
+                monto   = row[offset+4]      if len(row) > offset+4 else ''
+                return (cuenta, nombre, parcela, fecha, monto)
+            nombre  = str(row[offset])
+            parcela = str(row[offset+1]) if len(row) > offset+1 else ''
+            if len(row) > offset+3 and all(str(row[offset+i]).isdigit() for i in (2,3)):
+                mes  = int(row[offset+2]); anio = str(row[offset+3])
+                fecha = f'{anio}-{mes:02d}'
+                monto = row[offset+4] if len(row) > offset+4 else ''
+            else:
+                fecha = str(row[offset+2]) if len(row) > offset+2 else ''
+                monto = row[offset+3]      if len(row) > offset+3 else ''
+            cuenta = nombre_a_cuenta(nombre)
+            return (cuenta, nombre, parcela, fecha, monto)
+    
+        def poblar(lista):
+            tree.delete(*tree.get_children())
+            for i, r in enumerate(lista):
+                tree.insert('', 'end', iid=str(i), values=to_display(r))
+    
+        poblar(regs)
+    
+        def aplicar_filtros(_=None):
+            f = {i: e.get().strip().lower() for i, e in filtro_entrys.items()}
+            filtrados = []
+            for r in regs:
+                dis = to_display(r)
+                if all(not f[i] or f[i] in str(dis[i]).lower() for i in f):
+                    filtrados.append(r)
+            poblar(filtrados)
+    
+        for ent in filtro_entrys.values():
+            ent.bind('<KeyRelease>', aplicar_filtros)
+    
+        # ---------------- botones ----------------
+        btn_frame = ttk.Frame(cont)
+        btn_frame.grid(row=2, column=0, sticky='w', pady=(5, 0))
+        btn_del  = ttk.Button(btn_frame, text='Eliminar seleccionado',
+                              style='Big.TButton')
+        btn_edit = ttk.Button(btn_frame, text='Editar seleccionado',
+                              style='Big.TButton')
+        btn_del.grid(row=0, column=0, padx=5)
+        btn_edit.grid(row=0, column=1, padx=5)
+    
+        def eliminar():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.'); return
+            idx = int(sel[0])
+            if not messagebox.askyesno('Confirmar', '¿Eliminar registro seleccionado?'):
+                return
+            datos = storage.load_liquidaciones()
+            if 0 <= idx < len(datos):
+                datos.pop(idx)
+                storage.save_liquidaciones(datos)
+                regs[:] = datos
+                poblar(regs)
+    
+        def editar():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning('Atención', 'Seleccione un registro.'); return
             idx = int(sel[0])
             if idx >= len(regs):
                 return
-            orig = list(to_display(regs[idx]))  # lista mutable
+            orig = list(to_display(regs[idx]))
     
             win = tk.Toplevel(self); win.title('Editar liquidación')
             entries = []
@@ -2702,26 +2633,22 @@ class App(tk.Tk):
                    .grid(row=i, column=0, sticky='e', padx=5, pady=2)
                 e = ttk.Entry(win, style='Field.TEntry')
                 e.grid(row=i, column=1, padx=5, pady=2)
-                e.insert(0, orig[i])
-                entries.append(e)
+                e.insert(0, orig[i]); entries.append(e)
     
             def guardar():
                 try:
-                    nuevo = [entries[0].get().strip(),             # cuenta
-                             entries[1].get().strip(),             # nombre
-                             entries[2].get().strip(),             # parcela
-                             entries[3].get().strip(),             # fecha
-                             float(entries[4].get())]              # monto
+                    nuevo = (entries[0].get().strip(), entries[1].get().strip(),
+                             entries[2].get().strip(), entries[3].get().strip(),
+                             float(entries[4].get()))
                 except ValueError:
-                    messagebox.showerror('Error', 'Monto inválido')
-                    return
-                regs[idx] = tuple(nuevo)
+                    messagebox.showerror('Error', 'Monto inválido'); return
+                regs[idx] = nuevo
                 storage.save_liquidaciones(regs)
-                poblar(regs)
-                win.destroy()
+                poblar(regs); win.destroy()
     
-            ttk.Button(win, text='Guardar', command=guardar, style='Big.TButton')\
-               .grid(row=len(cols), column=0, columnspan=2, pady=10)
+            ttk.Button(win, text='Guardar', command=guardar,
+                       style='Big.TButton').grid(row=len(cols), column=0,
+                                                 columnspan=2, pady=10)
     
         btn_del.configure(command=eliminar)
         btn_edit.configure(command=editar)
