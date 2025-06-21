@@ -1552,8 +1552,20 @@ class App(tk.Tk):
 
         ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel').pack(pady=(0,20))
 
-        fields = ttk.Frame(cont)
-        fields.pack()
+        header = ttk.Frame(cont, padding=(0,10))
+        header.pack(fill='x')
+        left = ttk.Frame(header)
+        left.pack(side='left', padx=5)
+        ttk.Label(left, text='BIOCULTIVOS SAS', style='Title.TLabel').pack(anchor='w')
+        ttk.Label(left, text='CUIT 30-71841359-8', style='Header.TLabel').pack(anchor='w')
+        right = ttk.Frame(header)
+        right.pack(side='right', padx=5)
+        ttk.Label(right, text='Condominio El Michay', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='Chacra 032-E-007-01C', style='Header.TLabel').pack(anchor='e')
+        ttk.Label(right, text='General Fernández Oro (R.N.)', style='Header.TLabel').pack(anchor='e')
+
+        fields = ttk.Frame(cont, padding=5)
+        fields.pack(fill='x', pady=(0,10))
 
         ttk.Label(fields, text='Nombre y Apellido:', style='Field.TLabel')\
             .grid(row=0, column=0, sticky='e', padx=5, pady=5)
