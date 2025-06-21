@@ -158,6 +158,19 @@ def filter_rows(lista_registros, filtros):
     return resultado
 
 
+def make_scrollable(parent: tk.Widget) -> tuple[tk.Canvas, ttk.Frame, int, ttk.Scrollbar]:
+    """Return a canvas with a vertically scrollable frame inside."""
+    canvas = tk.Canvas(parent, highlightthickness=0)
+    canvas.pack(side="left", expand=True, fill="both")
+    vsb = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+    vsb.pack(side="right", fill="y")
+    canvas.configure(yscrollcommand=vsb.set)
+    frame = ttk.Frame(canvas)
+    win_id = canvas.create_window((0, 0), window=frame, anchor="nw")
+    center_in_canvas(canvas, frame, win_id, vsb=vsb)
+    return canvas, frame, win_id, vsb
+
+
 
 class App(tk.Tk):
     def __init__(self):
@@ -511,10 +524,10 @@ class App(tk.Tk):
         # 0) Limpiar cualquier widget previo en “parent”
         for w in parent.winfo_children():
             w.destroy()
-    
-        # 1) Contenedor principal dentro de “parent”
-        cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.pack(expand=True, fill='both', padx=10, pady=10)
+
+        # 1) Contenedor principal desplazable
+        canvas, cont, cont_win, vsb = make_scrollable(parent)
+        cont.configure(padding=20, relief='groove')
     
         # 2) Título
         ttk.Label(cont, text='Registro Ingreso', style='Title.TLabel').pack(pady=(0,20))
@@ -1241,9 +1254,9 @@ class App(tk.Tk):
         for w in parent.winfo_children():
             w.destroy()
 
-        # 2) Contenedor principal centrado
-        cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.pack(expand=True, fill='both', padx=10, pady=10)
+        # 2) Contenedor principal centrado y desplazable
+        canvas, cont, cont_win, vsb = make_scrollable(parent)
+        cont.configure(padding=20, relief='groove')
 
         # 3) Título
         ttk.Label(cont, text='Registro Egreso', style='Title.TLabel').pack(pady=(0,20))
@@ -1547,8 +1560,8 @@ class App(tk.Tk):
         for w in parent.winfo_children():
             w.destroy()
 
-        cont = ttk.Frame(parent, padding=20, relief='groove')
-        cont.pack(expand=True, fill='both', padx=10, pady=10)
+        canvas, cont, cont_win, vsb = make_scrollable(parent)
+        cont.configure(padding=20, relief='groove')
 
         ttk.Label(cont, text='Registro de Cliente', style='Title.TLabel').pack(pady=(0,20))
 
@@ -1748,9 +1761,8 @@ class App(tk.Tk):
 
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-
         table.grid_rowconfigure(1, weight=1)
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -1959,7 +1971,6 @@ class App(tk.Tk):
         vsb.grid(row=1, column=len(cols), sticky='ns')
         table.grid_rowconfigure(1, weight=1)
         center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -2116,15 +2127,6 @@ class App(tk.Tk):
         ttk.Label(f2, text='Cuenta:', style='Field.TLabel').grid(row=0, column=0)
         e_c = ttk.Entry(f2, style='Field.TEntry'); e_c.grid(row=0, column=1)
 
-        center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
-        )
         e_i = ttk.Entry(f2, style='Field.TEntry'); e_i.grid(row=0, column=3)
         ttk.Label(f2, text='%DByCR:').grid(row=0, column=4, padx=10)
         e_d = ttk.Entry(f2, style='Field.TEntry'); e_d.grid(row=0, column=5)
@@ -2415,6 +2417,7 @@ class App(tk.Tk):
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
         table.grid_rowconfigure(1, weight=1)
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
     
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -2593,6 +2596,7 @@ class App(tk.Tk):
         vsb.grid(row=1, column=len(cols), sticky='ns')
         table.grid_rowconfigure(1, weight=1)
     
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
         for c in cols:
             tree.heading(c, text=c, anchor='center')
             tree.column(c, width=130 if c != 'Nombre' else 220, anchor='center')
