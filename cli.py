@@ -1197,6 +1197,7 @@ class App(tk.Tk):
                     if nombre_plan != concept.strip():
                         messagebox.showerror(
                             'Error',
+            get_next_cobro_id(),
                             f'Nombre de cuenta {code} no coincide con la liquidación.'
                         )
                         return
