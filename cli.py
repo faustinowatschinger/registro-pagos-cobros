@@ -42,37 +42,28 @@ class PlaceholderEntry(ttk.Entry):
     def __init__(self, master=None, placeholder="", **kwargs):
         super().__init__(master, **kwargs)
         self.placeholder = placeholder
+        self._placeholder_color = "grey"
+        self._default_fg = self.cget("foreground")
         self._ph_visible = False
         self.bind("<FocusIn>", self._clear)
         self.bind("<FocusOut>", self._show)
         self._show()
 
     def get(self):
-        val = super().get()
-        return "" if self._ph_visible else val
+        return "" if self._ph_visible else super().get()
 
-    def _show(self, event=None):
-        if not self.get():
-            self._ph_visible = True
-def center_in_canvas(canvas, widget, win_id,
-                     hsb=None, vsb=None, tree=None, min_col_w=80):
-
-        if tree is not None:
-            cols = tree["columns"]
-            if cols:
-                col_w = max(min_col_w, canvas_width // len(cols))
-                for c in cols:
-                    tree.column(c, width=col_w)
-
-        if vsb is not None:
-            need_v = canvas.bbox("all")[3] > canvas.winfo_height()
-            if need_v:
-                vsb.grid()
-            else:
-                vsb.grid_remove()
-
-            self.configure(foreground="black")
+    def _clear(self, _=None):
+        if self._ph_visible:
+            self.delete(0, "end")
+            self.configure(foreground=self._default_fg)
             self._ph_visible = False
+
+    def _show(self, _=None):
+        if not super().get():
+            self._ph_visible = True
+            self.configure(foreground=self._placeholder_color)
+            self.delete(0, "end")
+            self.insert(0, self.placeholder)
 
 # Lectura genérica de registros
 def read_records(path):
@@ -311,15 +302,6 @@ class App(tk.Tk):
         cont = ttk.Frame(parent, padding=5)
         cont.pack(expand=True, fill='both')
 
-        center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
-        )
 
         full_path = os.path.join(ensure_data_directory(), filename)
         registros = read_records(full_path)
@@ -360,8 +342,10 @@ class App(tk.Tk):
 
         hsb = ttk.Scrollbar(cont, orient='horizontal')
         hsb.grid(row=1, column=0, sticky='ew')
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
-        center_in_canvas(table_canvas, table, table_win, hsb)
+        table_canvas.configure(xscrollcommand=hsb.set)
+
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(headers), sticky='ew')
@@ -406,6 +390,7 @@ class App(tk.Tk):
         vsb.grid(row=1, column=len(headers), sticky='ns')
 
         table.grid_rowconfigure(1, weight=1)
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         for h in headers:
             tree.heading(h, text=h)
@@ -1237,7 +1222,7 @@ class App(tk.Tk):
             iva_val,
             obs,
         )
-        if save_cobros((c,)):
+        if save_cobros((cobro_rec,)):
             messagebox.showinfo('Éxito', 'Cobro guardado.')
         else:
             messagebox.showerror('Error', 'No se pudo guardar el cobro.')
@@ -1641,24 +1626,25 @@ class App(tk.Tk):
 
 
     def _save_cliente(self, nombre, dni, direccion, t1, t2, email, p1, p2, p3, sup, obs):
-        c = cliente(
-        center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
+        cli_rec = cliente(
+            get_next_clients_id(),
+            nombre,
+            dni,
+            direccion,
+            t1,
+            t2,
+            email,
+            p1,
+            p2,
+            p3,
+            sup,
+            obs,
         )
-
-            nombre, dni, direccion,
-            t1, t2, email,
-            p1, p2, p3,
-            sup, obs
-        )
-        save_clients((c,))
-        messagebox.showinfo('Éxito', 'Cliente registrado.')
+        if save_clients((cli_rec,)):
+            messagebox.showinfo('Éxito', 'Cliente registrado.')
+        else:
+            messagebox.showerror('Error', 'No se pudo guardar el cliente.')
+        self._load_data()
         self._show_frame('lst_clientes')
 
 
@@ -1692,12 +1678,18 @@ class App(tk.Tk):
         # Frame desplazable horizontalmente
         table_canvas = tk.Canvas(cont, highlightthickness=0)
         table_canvas.grid(row=1, column=0, sticky='nsew', columnspan=len(cols))
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
+        cont.grid_rowconfigure(1, weight=1)
+
+        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        hsb.grid(row=2, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 )    # (o el valor mínimo que prefieras))
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
@@ -1741,6 +1733,7 @@ class App(tk.Tk):
 
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         table.grid_rowconfigure(1, weight=1)
 
@@ -1898,10 +1891,8 @@ class App(tk.Tk):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 ) 
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
 
@@ -1952,6 +1943,8 @@ class App(tk.Tk):
         tree.grid(row=1, column=0, columnspan=len(cols), sticky='nsew')
         vsb.grid(row=1, column=len(cols), sticky='ns')
         table.grid_rowconfigure(1, weight=1)
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
+        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
 
         for c in cols:
             tree.heading(c, text=c, anchor='center')
@@ -2156,13 +2149,20 @@ class App(tk.Tk):
         cont.grid_columnconfigure(0, weight=1)
     
         table_canvas = tk.Canvas(cont, highlightthickness=0)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
+        table_canvas.grid(row=0, column=0, sticky='nsew')
+        cont.grid_rowconfigure(0, weight=1)
+
+        hsb = ttk.Scrollbar(cont, orient='horizontal')
+        hsb.grid(row=1, column=0, sticky='ew')
+        table_canvas.configure(xscrollcommand=hsb.set)
+
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
 
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
         table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 ) 
     
         # Filtros
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
@@ -2316,25 +2316,12 @@ class App(tk.Tk):
             except ValueError:
                 messagebox.showerror('Error', 'Valor inválido.')
     
-        # --- dentro de _build_tax_pagos() ---
         ttk.Button(
-
-        center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
-        )
-
+            frm_add,
             text='Agregar',
             command=agregar,
             style='Big.TButton'
         ).grid(row=1, column=0, columnspan=4, pady=(10, 0))
-
-# ❷  BORRA la línea ‘cols = ...’ que quedó pegada aquí
 
 
 
@@ -2368,7 +2355,9 @@ class App(tk.Tk):
         hsb.grid(row=1, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
     
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
+        table = ttk.Frame(table_canvas)
+        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
+
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
     
@@ -2519,15 +2508,7 @@ class App(tk.Tk):
     def _build_liquidaciones(self, parent):
         # ───────── limpiar frame ─────────
         for w in parent.winfo_children():
-        center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
-        )
+            w.destroy()
 
     
         ttk.Label(parent, text='Liquidaciones', style='Title.TLabel').pack(pady=10)
@@ -2557,7 +2538,6 @@ class App(tk.Tk):
     
         table.bind('<Configure>', lambda _=None:
                    table_canvas.configure(scrollregion=table_canvas.bbox('all')))
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 ) 
     
         # ───────── filtros ─────────
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
@@ -2568,7 +2548,13 @@ class App(tk.Tk):
     
         filtro_entrys = {}
         for idx, col in enumerate(cols):
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110)
+            ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
+            ent.grid(row=0, column=idx, padx=1, sticky='ew')
+            filtro_frame.grid_columnconfigure(idx, weight=1)
+            filtro_entrys[idx] = ent
+        filtro_canvas.update_idletasks()
+        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
+
         vsb = ttk.Scrollbar(table, orient='vertical')
     
         def _tree_xview(*args):
