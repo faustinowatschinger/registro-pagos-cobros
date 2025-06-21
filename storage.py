@@ -342,3 +342,20 @@ def load_liquidaciones():
         out.append((cuenta, nombre.strip(), parcela.strip(), fecha, monto))
 
     return out
+
+def save_liquidaciones(liq_list):
+    """Overwrite liquidaciones file with normalized tuples."""
+    path = os.path.join(ensure_data_directory(), LIQUIDACIONES_FILE)
+    with open(path, 'w', encoding='utf-8') as f:
+        for rec in liq_list:
+            cuenta, nombre, parcela, fecha, monto = rec
+            f.write(repr((cuenta, nombre, parcela, fecha, float(monto))) + "\n")
+    return True
+
+
+def append_liquidacion(cuenta, nombre, fecha, monto, parcela=''):
+    """Append single liquidation record to file."""
+    liqs = load_liquidaciones()
+    liqs.append((str(cuenta), str(nombre), str(parcela), str(fecha), float(monto)))
+    save_liquidaciones(liqs)
+    return True
