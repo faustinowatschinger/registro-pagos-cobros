@@ -275,3 +275,70 @@ def apply_payment_expensa(cuenta, amount, fecha):
     mes = _month_from(fecha)
     exps.append((str(cuenta), mes, -abs(float(amount))))
     save_expensas(exps)
+
+# --- Liquidaciones ------------------------------------------------
+
+LIQUIDACIONES_FILE = 'liquidaciones.txt'
+LIQUIDACIONES_FALLBACK = 'liquidaciones_energia.txt'
+
+def load_liquidaciones():
+    """
+    Devuelve lista de tuplas normalizadas:
+    (cuenta:str, nombre:str, parcela:str, fecha:'YYYY-MM', monto:float)
+    """
+    data_dir = ensure_data_directory()
+    path = os.path.join(data_dir, LIQUIDACIONES_FILE)
+    if not os.path.exists(path):
+        path = os.path.join(data_dir, LIQUIDACIONES_FALLBACK)
+
+    out = []
+    if not os.path.exists(path):
+        return out
+
+    for line in open(path, encoding='utf-8'):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            t = ast.literal_eval(line)
+        except Exception:
+            continue
+        if not isinstance(t, tuple):
+            continue
+
+        # saltar encabezado
+        if t and 'CLIENTE' in str(t[0]).upper():
+            continue
+
+        # detectar formatos
+        if len(t) == 6 and str(t[0]).isdigit():  # formato con ID
+            id_cliente, nombre, parcela, mes, anio, imp = map(str, t)
+            cuenta = f"11-26-{id_cliente.zfill(3)}"
+        elif len(t) == 5 and str(t[0]).isdigit():
+            id_cliente, nombre, parcela, fecha, imp = map(str, t)
+            cuenta = f"11-26-{id_cliente.zfill(3)}"
+            out.append((cuenta, nombre.strip(), parcela.strip(), fecha.strip(), float(imp.replace(',', '.'))))
+            continue
+        elif len(t) == 5:  # formato sin cuenta, sin ID
+            nombre, parcela, mes, anio, imp = map(str, t)
+            cuenta = '—'
+        elif len(t) == 4 and str(t[0]).startswith('11-26'):  # cuenta completa
+            cuenta, nombre, fecha, imp = map(str, t)
+            out.append((cuenta.strip(), nombre.strip(), '', fecha.strip(), float(imp.replace(',', '.'))))
+            continue
+        elif len(t) == 5 and str(t[0]).startswith('11-26'):
+            cuenta, nombre, parcela, fecha, imp = map(str, t)
+            out.append((cuenta.strip(), nombre.strip(), parcela.strip(), fecha.strip(), float(imp.replace(',', '.'))))
+            continue
+        else:
+            continue
+
+        try:
+            fecha = f"{anio.strip()}-{int(mes):02d}"
+            monto = float(imp.replace(',', '.'))
+        except Exception:
+            continue
+
+        out.append((cuenta, nombre.strip(), parcela.strip(), fecha, monto))
+
+    return out
