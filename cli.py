@@ -363,13 +363,8 @@ class App(tk.Tk):
         hsb.grid(row=1, column=0, sticky='ew')
         table_canvas.configure(xscrollcommand=hsb.set)
 
-        table = ttk.Frame(table_canvas)
-        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
-        def _tbl_conf(_=None):
-            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-
-        table.bind('<Configure>', _tbl_conf)
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         center_in_canvas(table_canvas, table, table_win, hsb)
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
@@ -1703,13 +1698,8 @@ class App(tk.Tk):
         table_canvas.grid(row=1, column=0, sticky='nsew', columnspan=len(cols))
         cont.grid_rowconfigure(1, weight=1)
 
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
-        hsb.grid(row=2, column=0, sticky='ew', columnspan=len(cols))
-        table_canvas.configure(xscrollcommand=hsb.set)
-
-        table = ttk.Frame(table_canvas)
-        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         def _tbl_conf(_=None):
             table_canvas.configure(scrollregion=table_canvas.bbox('all'))
 
@@ -1919,13 +1909,8 @@ class App(tk.Tk):
 
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         center_in_canvas(
-            table_canvas,
-            table,
-            table_win,
-            hsb,
-            vsb=vsb,
-            tree=tree,
-            min_col_w=110,
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         )
 
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
@@ -2182,13 +2167,8 @@ class App(tk.Tk):
     
         table_canvas = tk.Canvas(cont, highlightthickness=0)
         table_canvas.grid(row=0, column=0, sticky='nsew')
-        cont.grid_rowconfigure(0, weight=1)
-    
-        hsb = ttk.Scrollbar(cont, orient='horizontal')
-        hsb.grid(row=1, column=0, sticky='ew')
-        table_canvas.configure(xscrollcommand=hsb.set)
-    
-        table = ttk.Frame(table_canvas)
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
 
         def _tbl_conf(_=None):
@@ -2402,13 +2382,8 @@ class App(tk.Tk):
         table_canvas.configure(xscrollcommand=hsb.set)
     
         table = ttk.Frame(table_canvas)
-        table_win = table_canvas.create_window((0, 0), window=table, anchor='nw')
-    
-        def _tbl_conf(_=None):
-            table_canvas.configure(scrollregion=table_canvas.bbox('all'))
-        table.bind('<Configure>', _tbl_conf)
-        center_in_canvas(table_canvas, table, table_win, hsb, vsb=vsb, tree=tree, min_col_w=110 ) 
-    
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         # --- filtros ---
         filtro_canvas = tk.Canvas(table, highlightthickness=0)
         filtro_canvas.grid(row=0, column=0, columnspan=len(cols), sticky='ew')
@@ -2610,13 +2585,8 @@ class App(tk.Tk):
         filtro_entrys = {}
         for idx, col in enumerate(cols):
             ent = PlaceholderEntry(filtro_frame, placeholder=col, style='Field.TEntry')
-            ent.grid(row=0, column=idx, padx=1, sticky='ew')
-            filtro_frame.grid_columnconfigure(idx, weight=1)
-            filtro_entrys[idx] = ent
-    
-        filtro_canvas.update_idletasks()
-        filtro_canvas.configure(scrollregion=filtro_canvas.bbox('all'))
-    
+            table_canvas, table, table_win, hsb,
+            vsb=vsb, tree=tree, min_col_w=110
         # ───────── treeview ─────────
         vsb = ttk.Scrollbar(table, orient='vertical')
     
